@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // helper function
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    match /users/{userId} {
+      // Basic rule for the user schema we created earlier
+      allow read, write: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    match /problem_cards/{cardId} {
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
+    }
+
+    match /tasks/{taskId} {
+      // Volunteers need to read tasks to get matched
+      allow read: if isAuthenticated(); 
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
+    }
+
+    match /volunteer_profiles/{profileId} {
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.uid;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+    }
+
+    match /match_records/{matchId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.volunteerId ||
+        request.auth.uid == get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.ngoId
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.volunteerId ||
+        request.auth.uid == get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.ngoId
+      );
+    }
+    
+    match /raw_uploads/{uploadId} {
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
+    }
+  }
+}

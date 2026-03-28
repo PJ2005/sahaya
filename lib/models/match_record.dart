@@ -1,0 +1,37 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'converters.dart';
+
+part 'match_record.freezed.dart';
+part 'match_record.g.dart';
+
+enum MatchStatus { open, accepted, proof_submitted, proof_approved, proof_rejected, completed }
+
+@freezed
+class ProofObject with _$ProofObject {
+  const factory ProofObject({
+    required List<String> photoUrls,
+    required String note,
+    @TimestampConverter() required DateTime submittedAt,
+  }) = _ProofObject;
+
+  factory ProofObject.fromJson(Map<String, dynamic> json) => _$ProofObjectFromJson(json);
+}
+
+@freezed
+class MatchRecord with _$MatchRecord {
+  const factory MatchRecord({
+    required String id,
+    required String taskId,
+    required String volunteerId,
+    required double matchScore,
+    required MatchStatus status,
+    required String missionBriefing,
+    required String whatToBring,
+    ProofObject? proof,
+    String? adminReviewNote,
+    @TimestampConverter() DateTime? completedAt,
+  }) = _MatchRecord;
+
+  factory MatchRecord.fromJson(Map<String, dynamic> json) => _$MatchRecordFromJson(json);
+}
