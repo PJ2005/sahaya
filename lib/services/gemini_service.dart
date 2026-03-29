@@ -5,11 +5,10 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/raw_upload.dart';
 import '../models/problem_card.dart';
 import 'extraction_service.dart';
-import 'package:uuid/uuid.dart';
 
 class GeminiService {
   /// Core Structure routing raw generically parsed/image payload structurally to LLM Schema
-  static Future<ProblemCard> structureProblemCard(RawUpload upload) async {
+  static Future<List<ProblemCard>> structureProblemCard(RawUpload upload) async {
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty) {
       throw Exception('Missing GEMINI_API_KEY securely configured locally!.');
@@ -31,23 +30,29 @@ class GeminiService {
       ),
     );
 
-    final promptText = '''
-You are an expert NGO Field Data Extractor. Analyze the generic provided payload natively.
-Extract the fundamental problem strictly into valid JSON matching this mapping object without markdown:
-{
-  "issueType": "water_access" | "sanitation" | "education" | "nutrition" | "healthcare" | "livelihood" | "other",
-  "locationWard": "String (Extract natively or estimate default)",
-  "locationCity": "String (Extract natively or estimate default)",
-  "severityLevel": "low" | "medium" | "high" | "critical",
-  "affectedCount": integer (Estimate based on optical scan magnitude),
-  "description": "String (Provide a physically comprehensive summary block)",
-  "confidenceScore": float (0.0 to 1.0)
-}
-''';
+    final String promptText = """
+You are a massive array-extraction agent for NGO community surveys. 
+The input will explicitly be a sequence of data, such as a nested array of CSV rows, Excel coordinates, or OCR text covering multiple separate issues.
+Extract every single independent field problem into its own logical structure.
+Return ONLY a valid geometric JSON Array `[...]` of mapped objects, strictly without markdown wrappers. 
+If you only detect ONE single issue, STILL wrap it natively as a 1-item JSON array.
+For EACH independent extracted problem, strictly return:
+- issueType (one of: water_access, sanitation, education, nutrition, healthcare, livelihood, other)
+- locationWard (string)
+- locationCity (string)
+- severityLevel (one of: low, medium, high, critical)
+- affectedCount (integer or null)
+- description (max 120 chars, anonymized — explicitly eliminate names, phone numbers)
+- confidenceScore (float 0.0 to 1.0)
+If a field cannot be mathematically determined for a specific object, inject null.
+""";
 
     List<Part> parts = [TextPart(promptText)];
 
-    if (uri.contains('.pdf') || uri.contains('.csv') || uri.contains('.xlsx') || uri.contains('.xls')) {
+    bool isTextPayload = upload.fileType == 'csv' || upload.fileType == 'document' || 
+                         uri.contains('.pdf') || uri.contains('.csv') || uri.contains('.xlsx') || uri.contains('.xls');
+
+    if (isTextPayload) {
       final text = await ExtractionService.extractText(upload);
       parts.add(TextPart("PAYLOAD NATIVE DATA:\n$text"));
     } else {
@@ -56,36 +61,47 @@ Extract the fundamental problem strictly into valid JSON matching this mapping o
       parts.add(DataPart(mime, bytes));
     }
 
-    final genResponse = await model.generateContent([Content.multi(parts)]);
-    final rawOutput = genResponse.text ?? '{}';
+    try {
+      final genResponse = await model.generateContent([Content.multi(parts)]);
+      String rawText = genResponse.text ?? '[]';
 
-    final cleanJsonStr = rawOutput.replaceAll('```json', '').replaceAll('```', '').trim();
-    final Map<String, dynamic> struct = jsonDecode(cleanJsonStr);
+      rawText = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
+      final List<dynamic> jsonList = jsonDecode(rawText);
+      final List<ProblemCard> multiCards = [];
 
-    final String issueTypeStr = struct['issueType']?.toString().toLowerCase() ?? 'other';
-    IssueType iType = IssueType.values.firstWhere((e) => e.name == issueTypeStr, orElse: () => IssueType.other);
+      int nodeIndex = 0;
+      for (var struct in jsonList) {
+        String issueStr = struct['issueType']?.toString().toLowerCase() ?? '';
+        IssueType iType = IssueType.values.firstWhere((e) => e.name == issueStr, orElse: () => IssueType.other);
 
-    final String severityStr = struct['severityLevel']?.toString().toLowerCase() ?? 'low';
-    SeverityLevel sLevel = SeverityLevel.values.firstWhere((e) => e.name == severityStr, orElse: () => SeverityLevel.low);
+        String severityStr = struct['severityLevel']?.toString().toLowerCase() ?? '';
+        SeverityLevel sLevel = SeverityLevel.values.firstWhere((e) => e.name == severityStr, orElse: () => SeverityLevel.low);
 
-    return ProblemCard(
-      id: const Uuid().v4(),
-      ngoId: upload.ngoId,
-      issueType: iType,
-      locationWard: struct['locationWard'] ?? 'Unknown Ward',
-      locationCity: struct['locationCity'] ?? 'Unknown City',
-      severityLevel: sLevel,
-      affectedCount: struct['affectedCount'] is int ? struct['affectedCount'] : 10,
-      description: struct['description'] ?? 'No explicit payload strictly discovered natively.',
-      confidenceScore: (struct['confidenceScore'] as num?)?.toDouble() ?? 0.88,
-      status: ProblemStatus.pending_review,
-      priorityScore: 0.0,
-      severityContrib: 0.0,
-      scaleContrib: 0.0,
-      recencyContrib: 0.0,
-      gapContrib: 0.0,
-      createdAt: DateTime.now(),
-      anonymized: false,
-    );
+        multiCards.add(ProblemCard(
+          id: '${upload.id}_$nodeIndex', // Structural mapping with index suffix appending
+          ngoId: upload.ngoId,
+          issueType: iType,
+          locationWard: struct['locationWard'] ?? 'Unknown Ward',
+          locationCity: struct['locationCity'] ?? 'Unknown City',
+          severityLevel: sLevel,
+          affectedCount: struct['affectedCount'] ?? 0,
+          description: struct['description'] ?? 'Extracted organically without valid descriptions.',
+          confidenceScore: (struct['confidenceScore'] as num?)?.toDouble() ?? 0.0,
+          status: ProblemStatus.pending_review,
+          priorityScore: 0.0,
+          severityContrib: 0.0,
+          scaleContrib: 0.0,
+          recencyContrib: 0.0,
+          gapContrib: 0.0,
+          createdAt: DateTime.now(),
+          anonymized: true,
+        ));
+        nodeIndex++;
+      }
+
+      return multiCards;
+    } catch (e) {
+      throw Exception('Gemini 1.5 JSON Array Native Mapping Crashed: $e');
+    }
   }
 }

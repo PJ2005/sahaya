@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'flavors.dart';
 import 'pages/my_home_page.dart';
-import 'pages/upload_screen.dart';
+import 'pages/ngo_dashboard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthGateway extends StatefulWidget {
@@ -45,7 +45,7 @@ class _AuthGatewayState extends State<AuthGateway> {
            return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         if (snapshot.hasData && snapshot.data != null) {
-           return UploadScreen(ngoId: snapshot.data!.uid);
+           return NgoDashboard(ngoId: snapshot.data!.uid);
         }
         return Scaffold(
           backgroundColor: const Color(0xFFF7F9FC),

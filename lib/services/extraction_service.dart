@@ -33,22 +33,21 @@ class ExtractionService {
 
       // 2. CSV Flat Execution
       if (upload.fileType == 'csv' || uriList.contains('.csv')) {
-        final csvString = utf8.decode(bytes);
+        final csvString = utf8.decode(bytes, allowMalformed: true);
         final rows = const CsvToListConverter().convert(csvString);
-        return rows.map((r) => r.join(', ')).join('\n');
+        return jsonEncode(rows); // Natively encode nested geometric array mathematically
       }
 
-      // 3. Excel Spreadsheet Decryption
+      // 3. Excel Array Mapping
       if (uriList.contains('.xlsx') || uriList.contains('.xls')) {
         final excel = Excel.decodeBytes(bytes);
-        final buffer = StringBuffer();
+        final List<List<dynamic>> excelRows = [];
         for (var table in excel.tables.keys) {
           for (var row in excel.tables[table]!.rows) {
-            final rowString = row.map((cell) => cell?.value?.toString() ?? '').join(', ');
-            buffer.writeln(rowString);
+            excelRows.add(row.map((cell) => cell?.value?.toString() ?? '').toList());
           }
         }
-        return buffer.toString();
+        return jsonEncode(excelRows); // Native Array injection mapping
       }
 
       // 4. Native Engine ML Kit OCR (Android/iOS)
