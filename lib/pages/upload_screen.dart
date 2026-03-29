@@ -238,7 +238,10 @@ class _UploadScreenState extends State<UploadScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              const Text('Or completely launch it manually by messaging the Bot:', style: TextStyle(fontSize: 12, color: Colors.black54)),
+              const Text(
+                'Or completely launch it manually by messaging the Bot:',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
               const SizedBox(height: 8),
               SelectableText(
                 '/register ${widget.ngoId}',
@@ -306,8 +309,9 @@ class _UploadScreenState extends State<UploadScreen>
 
             Color chipColor = Colors.orange;
             if (raw.status == UploadStatus.done) chipColor = Colors.green;
-            if (raw.status == UploadStatus.extraction_failed)
+            if (raw.status == UploadStatus.extraction_failed) {
               chipColor = Colors.red;
+            }
 
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -333,7 +337,7 @@ class _UploadScreenState extends State<UploadScreen>
                   ),
                 ),
                 title: Text(
-                  raw.fileType.toUpperCase() + ' Payload',
+                  '${raw.fileType.toUpperCase()} Payload',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -419,18 +423,28 @@ class _UploadScreenState extends State<UploadScreen>
                   } catch (e) {
                     if (!mounted) return;
                     Navigator.pop(context); // Close LLM generic loader visually
-                    
+
                     // Mark as generic manual recovery fallback
-                    await FirebaseFirestore.instance.collection('raw_uploads').doc(raw.id).update({'status': 'extraction_failed'});
-                    
+                    await FirebaseFirestore.instance
+                        .collection('raw_uploads')
+                        .doc(raw.id)
+                        .update({'status': 'extraction_failed'});
+
                     // Spawn explicit GUI Recovery form seamlessly wrapping physical context
                     showDialog(
                       context: context,
                       barrierDismissible: false,
                       builder: (_) => ManualEntryFormDialog(upload: raw),
                     );
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gemini execution completely fractured! Invoking Recovery UI... ($e)'), backgroundColor: Colors.orange));
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Gemini execution completely fractured! Invoking Recovery UI... ($e)',
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
                   }
                 },
               ),

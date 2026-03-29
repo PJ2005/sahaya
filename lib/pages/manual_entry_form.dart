@@ -25,7 +25,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
   void _saveManually() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
-    
+
     try {
       final card = ProblemCard(
         id: widget.upload.id, // 1:1 Explicit Mapping structural fix!
@@ -36,7 +36,8 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
         severityLevel: _severityLevel,
         affectedCount: int.tryParse(_affectedCountController.text) ?? 0,
         description: _descController.text.trim(),
-        confidenceScore: 1.0, // Human explicit mapping is mathematically 100% physically confident
+        confidenceScore:
+            1.0, // Human explicit mapping is mathematically 100% physically confident
         status: ProblemStatus.pending_review,
         priorityScore: 0.0,
         severityContrib: 0.0,
@@ -44,20 +45,37 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
         recencyContrib: 0.0,
         gapContrib: 0.0,
         createdAt: DateTime.now(),
-        anonymized: true, // Manual review enforces human PII scrubbing physically
+        anonymized:
+            true, // Manual review enforces human PII scrubbing physically
       );
 
-      await FirebaseFirestore.instance.collection('problem_cards').doc(card.id).set(card.toJson());
-      await FirebaseFirestore.instance.collection('raw_uploads').doc(widget.upload.id).update({'status': 'done'});
+      await FirebaseFirestore.instance
+          .collection('problem_cards')
+          .doc(card.id)
+          .set(card.toJson());
+      await FirebaseFirestore.instance
+          .collection('raw_uploads')
+          .doc(widget.upload.id)
+          .update({'status': 'done'});
 
       if (mounted) {
         Navigator.pop(context); // Kill strictly mapping dialog
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Human Overwrite Synchronized successfully!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Human Overwrite Synchronized successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Firebase Reject natively intercepted: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Firebase Reject natively intercepted: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -75,29 +93,84 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<IssueType>(
-                  value: _issueType,
-                  decoration: const InputDecoration(labelText: 'Physical Classification'),
-                  items: IssueType.values.map((v) => DropdownMenuItem(value: v, child: Text(v.name.toUpperCase()))).toList(),
+                  initialValue: _issueType,
+                  decoration: const InputDecoration(
+                    labelText: 'Physical Classification',
+                  ),
+                  items: IssueType.values
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(v.name.toUpperCase()),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) => setState(() => _issueType = v!),
                 ),
                 DropdownButtonFormField<SeverityLevel>(
-                  value: _severityLevel,
-                  decoration: const InputDecoration(labelText: 'Structural Severity'),
-                  items: SeverityLevel.values.map((v) => DropdownMenuItem(value: v, child: Text(v.name.toUpperCase()))).toList(),
+                  initialValue: _severityLevel,
+                  decoration: const InputDecoration(
+                    labelText: 'Structural Severity',
+                  ),
+                  items: SeverityLevel.values
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(v.name.toUpperCase()),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) => setState(() => _severityLevel = v!),
                 ),
-                TextFormField(controller: _wardController, decoration: const InputDecoration(labelText: 'Zone / Ward'), validator: (v) => v!.isEmpty ? 'Zone strictly required' : null),
-                TextFormField(controller: _cityController, decoration: const InputDecoration(labelText: 'Region / City'), validator: (v) => v!.isEmpty ? 'Region strictly required' : null),
-                TextFormField(controller: _affectedCountController, decoration: const InputDecoration(labelText: 'Numeric Human Impact (estimated)'), keyboardType: TextInputType.number),
-                TextFormField(controller: _descController, decoration: const InputDecoration(labelText: 'Generic Scrubbed Description'), maxLength: 120, maxLines: 3, validator: (v) => v!.isEmpty ? 'Description strictly required' : null),
+                TextFormField(
+                  controller: _wardController,
+                  decoration: const InputDecoration(labelText: 'Zone / Ward'),
+                  validator: (v) =>
+                      v!.isEmpty ? 'Zone strictly required' : null,
+                ),
+                TextFormField(
+                  controller: _cityController,
+                  decoration: const InputDecoration(labelText: 'Region / City'),
+                  validator: (v) =>
+                      v!.isEmpty ? 'Region strictly required' : null,
+                ),
+                TextFormField(
+                  controller: _affectedCountController,
+                  decoration: const InputDecoration(
+                    labelText: 'Numeric Human Impact (estimated)',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                TextFormField(
+                  controller: _descController,
+                  decoration: const InputDecoration(
+                    labelText: 'Generic Scrubbed Description',
+                  ),
+                  maxLength: 120,
+                  maxLines: 3,
+                  validator: (v) =>
+                      v!.isEmpty ? 'Description strictly required' : null,
+                ),
               ],
             ),
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: _isSaving ? null : () => Navigator.pop(context), child: const Text('Purge Action')),
-        ElevatedButton(onPressed: _isSaving ? null : _saveManually, style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white), child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('FORCE VALIDATE')),
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Purge Action'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _saveManually,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blueAccent,
+            foregroundColor: Colors.white,
+          ),
+          child: _isSaving
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text('FORCE VALIDATE'),
+        ),
       ],
     );
   }
