@@ -27,15 +27,17 @@ class ReviewQueueScreen extends StatelessWidget {
             .where('status', isEqualTo: 'pending_review') // Only generic Drafts
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return Center(
               child: Text(
                 "Structural Generic Reject natively intercepted: ${snapshot.error}",
                 style: const TextStyle(color: Colors.red),
               ),
             );
-          if (snapshot.connectionState == ConnectionState.waiting)
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final docs = snapshot.data?.docs ?? [];
           if (docs.isEmpty) {
