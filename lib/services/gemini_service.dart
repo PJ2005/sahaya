@@ -104,4 +104,89 @@ If a field cannot be mathematically determined for a specific object, inject nul
       throw Exception('Gemini 1.5 JSON Array Native Mapping Crashed: $e');
     }
   }
+
+  /// Generic AI editor: takes current data as JSON + a natural language instruction,
+  /// returns the modified JSON map. Works for both tasks and problem card fields.
+  static Future<Map<String, dynamic>> aiEdit({
+    required Map<String, dynamic> currentData,
+    required String instruction,
+    required String contextDescription,
+  }) async {
+    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('Missing GEMINI_API_KEY');
+    }
+
+    final model = GenerativeModel(
+      model: 'gemini-flash-lite-latest',
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      ),
+    );
+
+    final prompt = '''
+You are an AI assistant helping an NGO admin edit $contextDescription.
+Here is the current data as JSON:
+${jsonEncode(currentData)}
+
+The admin says: "$instruction"
+
+Apply the admin's requested changes to the data and return the FULL modified JSON object.
+Return ONLY valid JSON with the same keys, no markdown. Preserve all fields the admin did not ask to change.
+''';
+
+    final genResponse = await model.generateContent([Content.text(prompt)]);
+    String rawText = genResponse.text ?? '{}';
+    rawText = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
+    return Map<String, dynamic>.from(jsonDecode(rawText));
+  }
+
+  /// Batch AI editor: takes a list of items (e.g. all tasks under a problem card)
+  /// + a natural language instruction, returns the modified list.
+  /// Can add, remove, merge, or edit multiple items at once.
+  static Future<List<Map<String, dynamic>>> aiEditList({
+    required List<Map<String, dynamic>> currentItems,
+    required String instruction,
+    required String contextDescription,
+  }) async {
+    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('Missing GEMINI_API_KEY');
+    }
+
+    final model = GenerativeModel(
+      model: 'gemini-flash-lite-latest',
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      ),
+    );
+
+    final prompt = '''
+You are an AI assistant helping an NGO admin refactor $contextDescription.
+Here is the current list of items as a JSON array:
+${jsonEncode(currentItems)}
+
+The admin says: "$instruction"
+
+Apply the admin's requested changes. You may:
+- Edit any field in any existing item
+- Remove items the admin wants deleted
+- Add new items if the admin asks for them
+- Merge or split items as requested
+
+Return ONLY a valid JSON array of the resulting items. Preserve the structure and keys of each item.
+For any NEW items, set "id" to "NEW" so the system knows to create them.
+For removed items, simply omit them from the output array.
+''';
+
+    final genResponse = await model.generateContent([Content.text(prompt)]);
+    String rawText = genResponse.text ?? '[]';
+    rawText = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
+    final List<dynamic> parsed = jsonDecode(rawText);
+    return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
 }

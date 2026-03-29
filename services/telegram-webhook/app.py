@@ -7,7 +7,9 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import uuid
 import json
+from datetime import datetime, timezone
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 # Load env safely
 load_dotenv(dotenv_path='../../.env')
@@ -20,6 +22,7 @@ CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
 CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
 CLOUDINARY_UPLOAD_PRESET = os.getenv('CLOUDINARY_UPLOAD_PRESET')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # Fallback specifically to the key the user verified exists locally!
 FIREBASE_CREDS_PATH = os.getenv('FIREBASE_CREDENTIALS', '../../sahaya-7df6d-firebase-adminsdk-fbsvc-8301c19701.json')
@@ -191,9 +194,137 @@ def webhook():
             
     return jsonify({'status': 'success', 'docId': doc_id, 'url': cloudinary_url}), 200
 
+@app.route('/generate-tasks', methods=['POST'])
+def generate_tasks():
+    """Accepts an approved ProblemCard, decomposes it into volunteer tasks via Gemini,
+    computes a priority score, and writes everything back to Firestore."""
+    if not db:
+        return jsonify({'status': 'error', 'reason': 'Firestore not initialized'}), 500
+
+    payload = request.json
+    if not payload:
+        return jsonify({'status': 'error', 'reason': 'Missing JSON body'}), 400
+
+    problem_card_id = payload.get('problemCardId')
+    ngo_id = payload.get('ngoId')
+    if not problem_card_id or not ngo_id:
+        return jsonify({'status': 'error', 'reason': 'problemCardId and ngoId are required'}), 400
+
+    # 1. Read the ProblemCard from Firestore
+    try:
+        pc_ref = db.collection('problem_cards').document(problem_card_id)
+        pc_doc = pc_ref.get()
+        if not pc_doc.exists:
+            return jsonify({'status': 'error', 'reason': f'ProblemCard {problem_card_id} not found'}), 404
+        pc = pc_doc.to_dict()
+    except Exception as e:
+        return jsonify({'status': 'error', 'reason': f'Firestore read failed: {e}'}), 500
+
+    # 2. Call Gemini to decompose the problem into volunteer tasks
+    description = pc.get('description', 'No description')
+    issue_type = pc.get('issueType', 'other')
+    severity_level = pc.get('severityLevel', 'low')
+    affected_count = pc.get('affectedCount', 0)
+
+    task_prompt = f"""Given this community problem: {description}, issue type: {issue_type}, severity: {severity_level}, affected count: {affected_count} — decompose into 1 to 3 concrete volunteer tasks. Return ONLY a JSON array. Each task object: taskType (one of: data_collection, community_outreach, logistics_coordination, technical_repair, awareness_session, other), description (max 100 chars), skillTags (array from: communication, data_entry, transport, technical, medical, education, physical_labor, community_outreach), estimatedVolunteers (integer 1-5), estimatedDurationHours (integer 1-8). No other text."""
+
+    created_task_ids = []
+
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-flash-lite-latest')
+        response = model.generate_content(task_prompt)
+        raw_text = response.text.strip()
+        raw_text = raw_text.replace('```json', '').replace('```', '').strip()
+        tasks_json = json.loads(raw_text)
+    except Exception as e:
+        print(f'Gemini task decomposition failed: {e}')
+        # Fallback: generate a single generic task so the pipeline doesn't break
+        tasks_json = [{
+            'taskType': 'community_outreach',
+            'description': f'Investigate and address: {description[:80]}',
+            'skillTags': ['communication'],
+            'estimatedVolunteers': 2,
+            'estimatedDurationHours': 4
+        }]
+
+    # 3. Write each task to Firestore
+    for task_data in tasks_json:
+        task_id = str(uuid.uuid4())
+        task_type_str = task_data.get('taskType', 'other')
+        skill_tags = task_data.get('skillTags', [])
+        est_volunteers = task_data.get('estimatedVolunteers', 1)
+        est_duration = task_data.get('estimatedDurationHours', 1)
+        task_desc = task_data.get('description', 'Volunteer task')
+
+        task_doc = {
+            'id': task_id,
+            'problemCardId': problem_card_id,
+            'taskType': task_type_str,
+            'description': task_desc,
+            'skillTags': skill_tags,
+            'estimatedVolunteers': est_volunteers,
+            'estimatedDurationHours': float(est_duration),
+            'status': 'open',
+            'assignedVolunteerIds': []
+        }
+
+        try:
+            db.collection('tasks').document(task_id).set(task_doc)
+            created_task_ids.append(task_id)
+        except Exception as e:
+            print(f'Failed to write task {task_id}: {e}')
+
+    # 4. Compute priority score components
+    severity_map = {'low': 25, 'medium': 50, 'high': 75, 'critical': 100}
+    severity_score = severity_map.get(severity_level, 25)
+
+    affected_normalized = min(affected_count / 100.0, 1.0) * 100
+
+    # Recency: linear decay from 100 at 0 hours to 0 at 168 hours (7 days)
+    created_at = pc.get('createdAt')
+    if created_at is not None:
+        if hasattr(created_at, 'timestamp'):
+            created_dt = created_at
+        else:
+            created_dt = datetime.now(timezone.utc)
+        hours_since = (datetime.now(timezone.utc) - created_dt).total_seconds() / 3600.0
+    else:
+        hours_since = 0
+    recency_score = max(0, 100 - (hours_since / 168.0) * 100)
+
+    # Volunteer gap: 100 if zero volunteers assigned, 0 otherwise
+    volunteer_gap_score = 100  # Initially no volunteers assigned
+
+    # Weighted composite
+    severity_contrib = severity_score * 0.35
+    scale_contrib = affected_normalized * 0.30
+    recency_contrib = recency_score * 0.20
+    gap_contrib = volunteer_gap_score * 0.15
+    priority_score = severity_contrib + scale_contrib + recency_contrib + gap_contrib
+
+    # 5. Write priority scores back to ProblemCard
+    try:
+        pc_ref.update({
+            'priorityScore': round(priority_score, 2),
+            'severityContrib': round(severity_contrib, 2),
+            'scaleContrib': round(scale_contrib, 2),
+            'recencyContrib': round(recency_contrib, 2),
+            'gapContrib': round(gap_contrib, 2)
+        })
+    except Exception as e:
+        print(f'Failed to update priority score: {e}')
+
+    return jsonify({
+        'status': 'success',
+        'taskIds': created_task_ids,
+        'priorityScore': round(priority_score, 2)
+    }), 200
+
+
 @app.route('/', methods=['GET'])
 def health():
-    return jsonify({'status': 'healthy', 'service': 'Sahaya Ingestion Pipeline v1'}), 200
+    return jsonify({'status': 'healthy', 'service': 'Sahaya Ingestion Pipeline v2'}), 200
 
 if __name__ == '__main__':
     app.run(port=5000, host='0.0.0.0', debug=True)

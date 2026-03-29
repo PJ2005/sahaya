@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/problem_card.dart';
+import 'ai_assistant_sheet.dart';
 
 class ReviewCardDialog extends StatefulWidget {
   final ProblemCard draftCard;
@@ -49,22 +53,84 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
         status: ProblemStatus.approved,
       );
 
+      // 1. Save approved card to Firestore
       await FirebaseFirestore.instance
           .collection('problem_cards')
           .doc(updatedCard.id)
           .set(updatedCard.toJson());
 
-      if (mounted) {
-        Navigator.pop(context);
+      // 2. Call Azure backend to generate tasks + compute priority
+      final backendUrl = dotenv.env['BACKEND_URL'] ?? '';
+      bool taskGenSuccess = false;
+
+      if (backendUrl.isNotEmpty) {
+        try {
+          final response = await http.post(
+            Uri.parse('$backendUrl/generate-tasks'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'problemCardId': updatedCard.id,
+              'ngoId': updatedCard.ngoId,
+            }),
+          ).timeout(const Duration(seconds: 15));
+
+          if (response.statusCode == 200) {
+            final body = jsonDecode(response.body);
+            final taskCount = (body['taskIds'] as List?)?.length ?? 0;
+            taskGenSuccess = true;
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Approved! $taskCount tasks generated. Priority: ${body['priorityScore']}'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          }
+        } catch (_) {
+          // Timeout or network error — will show polling snackbar below
+        }
+      }
+
+      if (!taskGenSuccess && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Card natively approved and scheduled for Matching!'),
-            backgroundColor: Colors.green,
+            content: Text('Processing in background — check back shortly'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
           ),
         );
+        // Start background polling every 5 seconds until tasks appear
+        _pollForTasks(updatedCard.id);
       }
+
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) setState(() => _isProcessing = false);
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Approval failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _pollForTasks(String problemCardId) async {
+    for (int i = 0; i < 12; i++) {
+      await Future.delayed(const Duration(seconds: 5));
+      final taskSnap = await FirebaseFirestore.instance
+          .collection('tasks')
+          .where('problemCardId', isEqualTo: problemCardId)
+          .limit(1)
+          .get();
+      if (taskSnap.docs.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tasks are now ready! Check the Dashboard.'), backgroundColor: Colors.green),
+          );
+        }
+        return;
+      }
     }
   }
 
@@ -236,6 +302,45 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
         ),
       ),
       actions: [
+        // AI Assistant button
+        IconButton(
+          onPressed: _isProcessing ? null : () {
+            final currentFields = {
+              'issueType': _issueType.name,
+              'severityLevel': _severityLevel.name,
+              'locationWard': _wardController.text,
+              'locationCity': _cityController.text,
+              'affectedCount': int.tryParse(_countController.text) ?? 0,
+              'description': _descController.text,
+            };
+            AiAssistantSheet.show(
+              context,
+              currentData: currentFields,
+              contextDescription: 'an extracted problem card for NGO review',
+              onResult: (modified) {
+                setState(() {
+                  if (modified['issueType'] != null) {
+                    final it = IssueType.values.where((e) => e.name == modified['issueType'].toString().toLowerCase());
+                    if (it.isNotEmpty) _issueType = it.first;
+                  }
+                  if (modified['severityLevel'] != null) {
+                    final sl = SeverityLevel.values.where((e) => e.name == modified['severityLevel'].toString().toLowerCase());
+                    if (sl.isNotEmpty) _severityLevel = sl.first;
+                  }
+                  if (modified['locationWard'] != null) _wardController.text = modified['locationWard'].toString();
+                  if (modified['locationCity'] != null) _cityController.text = modified['locationCity'].toString();
+                  if (modified['affectedCount'] != null) _countController.text = modified['affectedCount'].toString();
+                  if (modified['description'] != null) _descController.text = modified['description'].toString();
+                });
+              },
+            );
+          },
+          icon: ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]).createShader(bounds),
+            child: const Icon(Icons.auto_awesome, color: Colors.white),
+          ),
+          tooltip: 'AI Assistant',
+        ),
         TextButton(
           onPressed: _isProcessing ? null : _discard,
           child: const Text(
