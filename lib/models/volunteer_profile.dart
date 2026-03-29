@@ -6,7 +6,8 @@ part 'volunteer_profile.freezed.dart';
 part 'volunteer_profile.g.dart';
 
 @freezed
-class VolunteerProfile with _$VolunteerProfile {
+abstract class VolunteerProfile with _$VolunteerProfile {
+  const VolunteerProfile._();
   const factory VolunteerProfile({
     required String id,
     required String uid,

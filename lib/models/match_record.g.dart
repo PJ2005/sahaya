@@ -35,9 +35,8 @@ _MatchRecord _$MatchRecordFromJson(Map<String, dynamic> json) => _MatchRecord(
       ? null
       : ProofObject.fromJson(json['proof'] as Map<String, dynamic>),
   adminReviewNote: json['adminReviewNote'] as String?,
-  completedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
-    json['completedAt'],
-    const TimestampConverter().fromJson,
+  completedAt: const OptionalTimestampConverter().fromJson(
+    json['completedAt'] as Timestamp?,
   ),
 );
 
@@ -52,9 +51,8 @@ Map<String, dynamic> _$MatchRecordToJson(_MatchRecord instance) =>
       'whatToBring': instance.whatToBring,
       'proof': instance.proof,
       'adminReviewNote': instance.adminReviewNote,
-      'completedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+      'completedAt': const OptionalTimestampConverter().toJson(
         instance.completedAt,
-        const TimestampConverter().toJson,
       ),
     };
 
@@ -66,13 +64,3 @@ const _$MatchStatusEnumMap = {
   MatchStatus.proof_rejected: 'proof_rejected',
   MatchStatus.completed: 'completed',
 };
-
-Value? _$JsonConverterFromJson<Json, Value>(
-  Object? json,
-  Value? Function(Json json) fromJson,
-) => json == null ? null : fromJson(json as Json);
-
-Json? _$JsonConverterToJson<Json, Value>(
-  Value? value,
-  Json? Function(Value value) toJson,
-) => value == null ? null : toJson(value);

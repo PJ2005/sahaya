@@ -214,8 +214,8 @@ return $default(_that.id,_that.ngoId,_that.cloudinaryUrl,_that.cloudinaryPublicI
 /// @nodoc
 @JsonSerializable()
 
-class _RawUpload implements RawUpload {
-  const _RawUpload({required this.id, required this.ngoId, required this.cloudinaryUrl, required this.cloudinaryPublicId, required this.fileType, @TimestampConverter() required this.uploadedAt, required this.status});
+class _RawUpload extends RawUpload {
+  const _RawUpload({required this.id, required this.ngoId, required this.cloudinaryUrl, required this.cloudinaryPublicId, required this.fileType, @TimestampConverter() required this.uploadedAt, required this.status}): super._();
   factory _RawUpload.fromJson(Map<String, dynamic> json) => _$RawUploadFromJson(json);
 
 @override final  String id;

@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'converters.dart';
@@ -10,7 +11,8 @@ enum SeverityLevel { low, medium, high, critical }
 enum ProblemStatus { pending_review, approved, extraction_failed }
 
 @freezed
-class ProblemCard with _$ProblemCard {
+abstract class ProblemCard with _$ProblemCard {
+  const ProblemCard._();
   const factory ProblemCard({
     required String id,
     required String ngoId,

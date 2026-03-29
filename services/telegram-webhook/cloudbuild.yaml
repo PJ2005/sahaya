@@ -1,0 +1,33 @@
+steps:
+  # 1. Containerize the application instance native mapped to Docker builder sequentially
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/telegram-webhook', '.']
+  
+  # 2. Push generated Docker architecture natively into Google Registry seamlessly
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/telegram-webhook']
+    
+  # 3. Mount structurally as Cloud Run microservice securely explicitly mapping secrets natively physically!
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'telegram-webhook'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/telegram-webhook'
+      - '--region'
+      - 'asia-south1'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'TELEGRAM_BOT_TOKEN=${_TELEGRAM_BOT_TOKEN},CLOUDINARY_CLOUD_NAME=${_CLOUDINARY_CLOUD_NAME},CLOUDINARY_API_KEY=${_CLOUDINARY_API_KEY},CLOUDINARY_API_SECRET=${_CLOUDINARY_API_SECRET},CLOUDINARY_UPLOAD_PRESET=${_CLOUDINARY_UPLOAD_PRESET}'
+
+substitutions:
+  _TELEGRAM_BOT_TOKEN: 'YOUR_TELEGRAM_TOKEN_FALLBACK'
+  _CLOUDINARY_CLOUD_NAME: 'YOUR_CLOUD_NAME_FALLBACK'
+  _CLOUDINARY_API_KEY: 'YOUR_API_KEY_FALLBACK'
+  _CLOUDINARY_API_SECRET: 'YOUR_API_SECRET_FALLBACK'
+  _CLOUDINARY_UPLOAD_PRESET: 'YOUR_PRESET_FALLBACK'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

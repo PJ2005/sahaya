@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'task_model.freezed.dart';
@@ -7,7 +8,8 @@ enum TaskType { data_collection, community_outreach, logistics_coordination, tec
 enum TaskStatus { open, filled, done }
 
 @freezed
-class TaskModel with _$TaskModel {
+abstract class TaskModel with _$TaskModel {
+  const TaskModel._();
   const factory TaskModel({
     required String id,
     required String problemCardId,

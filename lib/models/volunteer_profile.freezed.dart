@@ -216,8 +216,8 @@ return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.s
 /// @nodoc
 @JsonSerializable()
 
-class _VolunteerProfile implements VolunteerProfile {
-  const _VolunteerProfile({required this.id, required this.uid, @GeoPointConverter() required this.locationGeoPoint, required this.radiusKm, required final  List<String> skillTags, required this.languagePref, required this.availabilityWindowActive, @TimestampConverter() required this.availabilityUpdatedAt, this.fcmToken}): _skillTags = skillTags;
+class _VolunteerProfile extends VolunteerProfile {
+  const _VolunteerProfile({required this.id, required this.uid, @GeoPointConverter() required this.locationGeoPoint, required this.radiusKm, required final  List<String> skillTags, required this.languagePref, required this.availabilityWindowActive, @TimestampConverter() required this.availabilityUpdatedAt, this.fcmToken}): _skillTags = skillTags,super._();
   factory _VolunteerProfile.fromJson(Map<String, dynamic> json) => _$VolunteerProfileFromJson(json);
 
 @override final  String id;

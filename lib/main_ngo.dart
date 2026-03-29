@@ -6,11 +6,13 @@ import 'dart:io';
 import 'app.dart';
 import 'flavors.dart';
 import 'firebase_options_ngo.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 const bool useEmulator = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

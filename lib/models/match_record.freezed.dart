@@ -210,8 +210,8 @@ return $default(_that.photoUrls,_that.note,_that.submittedAt);case _:
 /// @nodoc
 @JsonSerializable()
 
-class _ProofObject implements ProofObject {
-  const _ProofObject({required final  List<String> photoUrls, required this.note, @TimestampConverter() required this.submittedAt}): _photoUrls = photoUrls;
+class _ProofObject extends ProofObject {
+  const _ProofObject({required final  List<String> photoUrls, required this.note, @TimestampConverter() required this.submittedAt}): _photoUrls = photoUrls,super._();
   factory _ProofObject.fromJson(Map<String, dynamic> json) => _$ProofObjectFromJson(json);
 
  final  List<String> _photoUrls;
@@ -290,7 +290,7 @@ as DateTime,
 /// @nodoc
 mixin _$MatchRecord {
 
- String get id; String get taskId; String get volunteerId; double get matchScore; MatchStatus get status; String get missionBriefing; String get whatToBring; ProofObject? get proof; String? get adminReviewNote;@TimestampConverter() DateTime? get completedAt;
+ String get id; String get taskId; String get volunteerId; double get matchScore; MatchStatus get status; String get missionBriefing; String get whatToBring; ProofObject? get proof; String? get adminReviewNote;@OptionalTimestampConverter() DateTime? get completedAt;
 /// Create a copy of MatchRecord
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -323,7 +323,7 @@ abstract mixin class $MatchRecordCopyWith<$Res>  {
   factory $MatchRecordCopyWith(MatchRecord value, $Res Function(MatchRecord) _then) = _$MatchRecordCopyWithImpl;
 @useResult
 $Res call({
- String id, String taskId, String volunteerId, double matchScore, MatchStatus status, String missionBriefing, String whatToBring, ProofObject? proof, String? adminReviewNote,@TimestampConverter() DateTime? completedAt
+ String id, String taskId, String volunteerId, double matchScore, MatchStatus status, String missionBriefing, String whatToBring, ProofObject? proof, String? adminReviewNote,@OptionalTimestampConverter() DateTime? completedAt
 });
 
 
@@ -449,7 +449,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String taskId,  String volunteerId,  double matchScore,  MatchStatus status,  String missionBriefing,  String whatToBring,  ProofObject? proof,  String? adminReviewNote, @TimestampConverter()  DateTime? completedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String taskId,  String volunteerId,  double matchScore,  MatchStatus status,  String missionBriefing,  String whatToBring,  ProofObject? proof,  String? adminReviewNote, @OptionalTimestampConverter()  DateTime? completedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MatchRecord() when $default != null:
 return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.status,_that.missionBriefing,_that.whatToBring,_that.proof,_that.adminReviewNote,_that.completedAt);case _:
@@ -470,7 +470,7 @@ return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String taskId,  String volunteerId,  double matchScore,  MatchStatus status,  String missionBriefing,  String whatToBring,  ProofObject? proof,  String? adminReviewNote, @TimestampConverter()  DateTime? completedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String taskId,  String volunteerId,  double matchScore,  MatchStatus status,  String missionBriefing,  String whatToBring,  ProofObject? proof,  String? adminReviewNote, @OptionalTimestampConverter()  DateTime? completedAt)  $default,) {final _that = this;
 switch (_that) {
 case _MatchRecord():
 return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.status,_that.missionBriefing,_that.whatToBring,_that.proof,_that.adminReviewNote,_that.completedAt);case _:
@@ -490,7 +490,7 @@ return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String taskId,  String volunteerId,  double matchScore,  MatchStatus status,  String missionBriefing,  String whatToBring,  ProofObject? proof,  String? adminReviewNote, @TimestampConverter()  DateTime? completedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String taskId,  String volunteerId,  double matchScore,  MatchStatus status,  String missionBriefing,  String whatToBring,  ProofObject? proof,  String? adminReviewNote, @OptionalTimestampConverter()  DateTime? completedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _MatchRecord() when $default != null:
 return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.status,_that.missionBriefing,_that.whatToBring,_that.proof,_that.adminReviewNote,_that.completedAt);case _:
@@ -504,8 +504,8 @@ return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.s
 /// @nodoc
 @JsonSerializable()
 
-class _MatchRecord implements MatchRecord {
-  const _MatchRecord({required this.id, required this.taskId, required this.volunteerId, required this.matchScore, required this.status, required this.missionBriefing, required this.whatToBring, this.proof, this.adminReviewNote, @TimestampConverter() this.completedAt});
+class _MatchRecord extends MatchRecord {
+  const _MatchRecord({required this.id, required this.taskId, required this.volunteerId, required this.matchScore, required this.status, required this.missionBriefing, required this.whatToBring, this.proof, this.adminReviewNote, @OptionalTimestampConverter() this.completedAt}): super._();
   factory _MatchRecord.fromJson(Map<String, dynamic> json) => _$MatchRecordFromJson(json);
 
 @override final  String id;
@@ -517,7 +517,7 @@ class _MatchRecord implements MatchRecord {
 @override final  String whatToBring;
 @override final  ProofObject? proof;
 @override final  String? adminReviewNote;
-@override@TimestampConverter() final  DateTime? completedAt;
+@override@OptionalTimestampConverter() final  DateTime? completedAt;
 
 /// Create a copy of MatchRecord
 /// with the given fields replaced by the non-null parameter values.
@@ -552,7 +552,7 @@ abstract mixin class _$MatchRecordCopyWith<$Res> implements $MatchRecordCopyWith
   factory _$MatchRecordCopyWith(_MatchRecord value, $Res Function(_MatchRecord) _then) = __$MatchRecordCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String taskId, String volunteerId, double matchScore, MatchStatus status, String missionBriefing, String whatToBring, ProofObject? proof, String? adminReviewNote,@TimestampConverter() DateTime? completedAt
+ String id, String taskId, String volunteerId, double matchScore, MatchStatus status, String missionBriefing, String whatToBring, ProofObject? proof, String? adminReviewNote,@OptionalTimestampConverter() DateTime? completedAt
 });
 
 

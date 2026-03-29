@@ -215,8 +215,8 @@ return $default(_that.id,_that.problemCardId,_that.taskType,_that.skillTags,_tha
 /// @nodoc
 @JsonSerializable()
 
-class _TaskModel implements TaskModel {
-  const _TaskModel({required this.id, required this.problemCardId, required this.taskType, required final  List<String> skillTags, required this.estimatedVolunteers, required this.estimatedDurationHours, required this.status, required final  List<String> assignedVolunteerIds}): _skillTags = skillTags,_assignedVolunteerIds = assignedVolunteerIds;
+class _TaskModel extends TaskModel {
+  const _TaskModel({required this.id, required this.problemCardId, required this.taskType, required final  List<String> skillTags, required this.estimatedVolunteers, required this.estimatedDurationHours, required this.status, required final  List<String> assignedVolunteerIds}): _skillTags = skillTags,_assignedVolunteerIds = assignedVolunteerIds,super._();
   factory _TaskModel.fromJson(Map<String, dynamic> json) => _$TaskModelFromJson(json);
 
 @override final  String id;

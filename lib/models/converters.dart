@@ -16,6 +16,22 @@ class TimestampConverter implements JsonConverter<DateTime, Timestamp> {
   Timestamp toJson(DateTime date) => Timestamp.fromDate(date);
 }
 
+class OptionalTimestampConverter implements JsonConverter<DateTime?, Timestamp?> {
+  const OptionalTimestampConverter();
+
+  @override
+  DateTime? fromJson(dynamic timestamp) {
+    if (timestamp == null) return null;
+    if (timestamp is Timestamp) {
+      return timestamp.toDate();
+    }
+    return null;
+  }
+
+  @override
+  Timestamp? toJson(DateTime? date) => date == null ? null : Timestamp.fromDate(date);
+}
+
 class GeoPointConverter implements JsonConverter<GeoPoint, GeoPoint> {
   const GeoPointConverter();
 

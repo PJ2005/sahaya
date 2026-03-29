@@ -224,8 +224,8 @@ return $default(_that.id,_that.ngoId,_that.issueType,_that.locationWard,_that.lo
 /// @nodoc
 @JsonSerializable()
 
-class _ProblemCard implements ProblemCard {
-  const _ProblemCard({required this.id, required this.ngoId, required this.issueType, required this.locationWard, required this.locationCity, required this.severityLevel, required this.affectedCount, required this.description, required this.confidenceScore, required this.status, required this.priorityScore, required this.severityContrib, required this.scaleContrib, required this.recencyContrib, required this.gapContrib, @TimestampConverter() required this.createdAt, required this.anonymized});
+class _ProblemCard extends ProblemCard {
+  const _ProblemCard({required this.id, required this.ngoId, required this.issueType, required this.locationWard, required this.locationCity, required this.severityLevel, required this.affectedCount, required this.description, required this.confidenceScore, required this.status, required this.priorityScore, required this.severityContrib, required this.scaleContrib, required this.recencyContrib, required this.gapContrib, @TimestampConverter() required this.createdAt, required this.anonymized}): super._();
   factory _ProblemCard.fromJson(Map<String, dynamic> json) => _$ProblemCardFromJson(json);
 
 @override final  String id;
