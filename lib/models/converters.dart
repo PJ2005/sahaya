@@ -44,3 +44,16 @@ class GeoPointConverter implements JsonConverter<GeoPoint, GeoPoint> {
   @override
   GeoPoint toJson(GeoPoint point) => point;
 }
+
+class OptionalGeoPointConverter implements JsonConverter<GeoPoint?, GeoPoint?> {
+  const OptionalGeoPointConverter();
+
+  @override
+  GeoPoint? fromJson(dynamic point) {
+    if (point is GeoPoint) return point;
+    return null;
+  }
+
+  @override
+  GeoPoint? toJson(GeoPoint? point) => point;
+}

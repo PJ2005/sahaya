@@ -16,6 +16,7 @@ abstract class VolunteerProfile with _$VolunteerProfile {
     required List<String> skillTags,
     required String languagePref,
     required bool availabilityWindowActive,
+    @Default(false) bool isPartialAvailability,
     @TimestampConverter() required DateTime availabilityUpdatedAt,
     String? fcmToken,
   }) = _VolunteerProfile;

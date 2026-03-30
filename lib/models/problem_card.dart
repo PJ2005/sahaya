@@ -19,6 +19,7 @@ abstract class ProblemCard with _$ProblemCard {
     required IssueType issueType,
     required String locationWard,
     required String locationCity,
+    @GeoPointConverter() required GeoPoint locationGeoPoint,
     required SeverityLevel severityLevel,
     required int affectedCount,
     required String description,

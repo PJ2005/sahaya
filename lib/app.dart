@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'flavors.dart';
-import 'pages/my_home_page.dart';
 import 'pages/ngo_dashboard.dart';
+import 'pages/volunteer/volunteer_gateway.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthGateway extends StatefulWidget {
@@ -101,7 +101,7 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget initialScreen = F.appFlavor == Flavor.ngo 
         ? const AuthGateway() 
-        : const MyHomePage();
+        : const VolunteerGateway();
 
     return MaterialApp(
       title: F.title,

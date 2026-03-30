@@ -12,6 +12,9 @@ _ProblemCard _$ProblemCardFromJson(Map<String, dynamic> json) => _ProblemCard(
   issueType: $enumDecode(_$IssueTypeEnumMap, json['issueType']),
   locationWard: json['locationWard'] as String,
   locationCity: json['locationCity'] as String,
+  locationGeoPoint: const GeoPointConverter().fromJson(
+    json['locationGeoPoint'] as GeoPoint,
+  ),
   severityLevel: $enumDecode(_$SeverityLevelEnumMap, json['severityLevel']),
   affectedCount: (json['affectedCount'] as num).toInt(),
   description: json['description'] as String,
@@ -35,6 +38,9 @@ Map<String, dynamic> _$ProblemCardToJson(_ProblemCard instance) =>
       'issueType': _$IssueTypeEnumMap[instance.issueType]!,
       'locationWard': instance.locationWard,
       'locationCity': instance.locationCity,
+      'locationGeoPoint': const GeoPointConverter().toJson(
+        instance.locationGeoPoint,
+      ),
       'severityLevel': _$SeverityLevelEnumMap[instance.severityLevel]!,
       'affectedCount': instance.affectedCount,
       'description': instance.description,

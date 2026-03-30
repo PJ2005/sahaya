@@ -1,5 +1,7 @@
 // ignore_for_file: constant_identifier_names
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'converters.dart';
 
 part 'task_model.freezed.dart';
 part 'task_model.g.dart';
@@ -19,6 +21,8 @@ abstract class TaskModel with _$TaskModel {
     required double estimatedDurationHours,
     required TaskStatus status,
     required List<String> assignedVolunteerIds,
+    @Default('Unknown Ward') String locationWard,
+    @OptionalGeoPointConverter() GeoPoint? locationGeoPoint,
   }) = _TaskModel;
 
   factory TaskModel.fromJson(Map<String, dynamic> json) => _$TaskModelFromJson(json);

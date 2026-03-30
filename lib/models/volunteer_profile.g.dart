@@ -19,6 +19,7 @@ _VolunteerProfile _$VolunteerProfileFromJson(Map<String, dynamic> json) =>
           .toList(),
       languagePref: json['languagePref'] as String,
       availabilityWindowActive: json['availabilityWindowActive'] as bool,
+      isPartialAvailability: json['isPartialAvailability'] as bool? ?? false,
       availabilityUpdatedAt: const TimestampConverter().fromJson(
         json['availabilityUpdatedAt'] as Timestamp,
       ),
@@ -36,6 +37,7 @@ Map<String, dynamic> _$VolunteerProfileToJson(_VolunteerProfile instance) =>
       'skillTags': instance.skillTags,
       'languagePref': instance.languagePref,
       'availabilityWindowActive': instance.availabilityWindowActive,
+      'isPartialAvailability': instance.isPartialAvailability,
       'availabilityUpdatedAt': const TimestampConverter().toJson(
         instance.availabilityUpdatedAt,
       ),

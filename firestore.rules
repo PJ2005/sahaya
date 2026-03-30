@@ -26,7 +26,7 @@ service cloud.firestore {
     }
 
     match /volunteer_profiles/{profileId} {
-      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.uid;
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == profileId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
     }
 

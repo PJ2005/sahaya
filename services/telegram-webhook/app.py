@@ -7,9 +7,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import uuid
 import json
-from datetime import datetime, timezone
+import math
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 import google.generativeai as genai
+from firebase_admin import messaging
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Load env safely
 load_dotenv(dotenv_path='../../.env')
@@ -61,6 +64,15 @@ else:
     except Exception as e:
         print(f"CRITICAL: ADC completely failed to bind natively! Error: {e}")
         db = None
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculates the great-circle mathematically between two literal GPS coordinates universally"""
+    R = 6371.0 # Earth Radius in Kilometers
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2) + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * (math.sin(dlon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 def send_telegram_message(chat_id, text):
     """Concrete Helper mapping replies instantly to Telegram Chat context."""
@@ -266,7 +278,9 @@ def generate_tasks():
             'estimatedVolunteers': est_volunteers,
             'estimatedDurationHours': float(est_duration),
             'status': 'open',
-            'assignedVolunteerIds': []
+            'assignedVolunteerIds': [],
+            'locationWard': pc.get('locationWard', 'Unknown Ward'),
+            'locationGeoPoint': pc.get('locationGeoPoint')
         }
 
         try:
@@ -315,16 +329,190 @@ def generate_tasks():
     except Exception as e:
         print(f'Failed to update priority score: {e}')
 
+    # 6. Chain Matching Engine directly for every created task
+    for target_task_id in created_task_ids:
+        try:
+            with app.test_request_context('/run-matching', method='POST', json={'taskId': target_task_id}):
+                match_res = run_matching()
+                print(f"Matching Sweep Native Completion for {target_task_id}: {match_res.status_code}")
+        except Exception as e:
+            print(f"WARNING: Matching auto-chain cleanly halted for task {target_task_id}: {e}")
+
     return jsonify({
         'status': 'success',
         'taskIds': created_task_ids,
         'priorityScore': round(priority_score, 2)
     }), 200
 
+@app.route('/run-matching', methods=['POST'])
+def run_matching():
+    """Generates explicit MatchRecords binding Volunteers to specific community Tasks."""
+    if not db:
+        return jsonify({'error': 'No Firestore connection natively.'}), 500
+
+    payload = request.json
+    task_id = payload.get('taskId') if payload else None
+    if not task_id:
+        return jsonify({'error': 'Missing taskId'}), 400
+
+    try:
+        # 1. Fetch Task and Parent ProblemCard
+        task_doc = db.collection('tasks').document(task_id).get()
+        if not task_doc.exists:
+             return jsonify({'error': 'Task natively dead'}), 404
+        task_data = task_doc.to_dict()
+        task_skills = task_data.get('skillTags', [])
+
+        pc_id = task_data.get('problemCardId')
+        pc_doc = db.collection('problem_cards').document(pc_id).get()
+        if not pc_doc.exists:
+             return jsonify({'error': 'Orphaned task mapping'}), 404
+        pc_data = pc_doc.to_dict()
+        
+        # Determine Problem GPS - default to Mock Chennai center if unparsed
+        pc_geo = pc_data.get('locationGeoPoint')
+        if pc_geo:
+            pc_lat, pc_lon = pc_geo.latitude, pc_geo.longitude
+        else:
+            pc_lat, pc_lon = 13.0827, 80.2707
+        
+        # 2. Query Available Volunteers
+        volunteers_query = db.collection('volunteer_profiles').where('availabilityWindowActive', '==', True).stream()
+        
+        matches = []
+        for v_doc in volunteers_query:
+             v_data = v_doc.to_dict()
+             
+             # 3. Location filtering
+             v_geo = v_data.get('locationGeoPoint')
+             radius_km = float(v_data.get('radiusKm', 10.0))
+             if not v_geo:
+                 continue
+             
+             dist_km = haversine(v_geo.latitude, v_geo.longitude, pc_lat, pc_lon)
+             if dist_km > radius_km + 5.0: # Giving a slight 5km boundary buffer just mathematically
+                 continue
+                 
+             # 4. Compute algorithm scores
+             normalized_distance = min(dist_km / max(radius_km, 1.0), 1.0)
+             
+             v_skills = v_data.get('skillTags', [])
+             overlap = len(set(v_skills).intersection(set(task_skills)))
+             
+             score = (overlap / max(len(task_skills), 1)) * 0.6 + (1.0 - normalized_distance) * 0.4
+             
+             matches.append({
+                 'volunteerId': v_doc.id,  # uid of the volunteer technically
+                 'score': score
+             })
+
+        # 5. Write Top 20 Matches
+        matches.sort(key=lambda x: x['score'], reverse=True)
+        top_matches = matches[:20]
+        
+        batch = db.batch()
+        for m in top_matches:
+             match_id = str(uuid.uuid4())
+             ref = db.collection('match_records').document(match_id)
+             batch.set(ref, {
+                 'id': match_id,
+                 'taskId': task_id,
+                 'volunteerId': m['volunteerId'],
+                 'matchScore': m['score'],
+                 'status': 'open',
+                 'createdAt': firestore.SERVER_TIMESTAMP
+             })
+             
+        batch.commit()
+        
+        return jsonify({'status': 'success', 'matches_generated': len(top_matches)}), 200
+
+    except Exception as e:
+        print(f"Matching Engine Exploded: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/', methods=['GET'])
 def health():
     return jsonify({'status': 'healthy', 'service': 'Sahaya Ingestion Pipeline v2'}), 200
+
+@app.route('/send-availability-reminders', methods=['POST'])
+def send_availability_reminders():
+    """Queries all volunteer profiles and pings them if their availability window is closed or stale"""
+    if not db:
+       return jsonify({'error': 'Firestore disconnected'}), 500
+
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    notified_count = 0
+
+    try:
+        # Since OR queries require index/composite complexity in Firestore, 
+        # we pull all active volunteers and evaluate in memory (since volunteer base is small for MVP)
+        volunteers_ref = db.collection('volunteer_profiles').stream()
+        
+        for doc in volunteers_ref:
+            v_data = doc.to_dict()
+            fcm_token = v_data.get('fcmToken')
+            if not fcm_token:
+                continue
+
+            # Need check-in if window is natively explicitly closed, or if the update is > 7 days old
+            window_active = v_data.get('availabilityWindowActive', False)
+            updated_at = v_data.get('availabilityUpdatedAt')
+            is_stale = False
+
+            if updated_at:
+                 # Check if the timestamp is more than 7 days old
+                 if hasattr(updated_at, 'timestamp'):
+                     update_dt = updated_at
+                 else:
+                     update_dt = datetime.now(timezone.utc) # Fallback to avoid crash
+                     
+                 # Make offset-aware if needed
+                 if update_dt.tzinfo is None:
+                     update_dt = update_dt.replace(tzinfo=timezone.utc)
+                 
+                 if update_dt < seven_days_ago:
+                     is_stale = True
+            else:
+                 is_stale = True
+
+            if not window_active or is_stale:
+                # Dispatch Push Notification via Firebase Admin SDK
+                msg = messaging.Message(
+                    notification=messaging.Notification(
+                        title="Available this weekend?",
+                        body="Tap to check-in and matched with nearby community needs!"
+                    ),
+                    token=fcm_token
+                )
+                try:
+                    messaging.send(msg)
+                    notified_count += 1
+                except Exception as e:
+                    print(f"Failed to push FCM to {doc.id}: {e}")
+
+        return jsonify({'status': 'success', 'notified': notified_count}), 200
+    except Exception as e:
+        print(f"Availability sweep exploded natively: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# Native Python Scheduler setup
+def scheduled_weekly_reminder():
+    """Triggered by APScheduler every Friday at 6:00 PM IST (which is 12:30 PM UTC)"""
+    print("Initiating automated weekly availability sweep...")
+    # Because we are inside the same process, we can just call the sweep directly without HTTP
+    # To keep it isolated or if scaled linearly across multiple workers, HTTP POSTing locally is also fine.
+    # We will just synthesize the request natively inline here.
+    with app.test_request_context('/send-availability-reminders', method='POST'):
+         res = send_availability_reminders()
+         print(f"Sweep complete natively: {res}")
+
+# Start the background scheduler
+scheduler = BackgroundScheduler()
+# 12:30 UTC = 18:00 IST (5 hrs 30 mins ahead) everyday on 'fri'
+scheduler.add_job(func=scheduled_weekly_reminder, trigger="cron", day_of_week='fri', hour=12, minute=30)
+scheduler.start()
 
 if __name__ == '__main__':
     app.run(port=5000, host='0.0.0.0', debug=True)

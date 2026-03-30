@@ -33,6 +33,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
         issueType: _issueType,
         locationWard: _wardController.text.trim(),
         locationCity: _cityController.text.trim(),
+        locationGeoPoint: const GeoPoint(13.0827, 80.2707),
         severityLevel: _severityLevel,
         affectedCount: int.tryParse(_affectedCountController.text) ?? 0,
         description: _descController.text.trim(),

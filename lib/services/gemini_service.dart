@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/raw_upload.dart';
 import '../models/problem_card.dart';
 import 'extraction_service.dart';
@@ -40,6 +41,8 @@ For EACH independent extracted problem, strictly return:
 - issueType (one of: water_access, sanitation, education, nutrition, healthcare, livelihood, other)
 - locationWard (string)
 - locationCity (string)
+- latitude (float, estimate based securely on the ward/city name for routing)
+- longitude (float, estimate based securely on the ward/city name for routing)
 - severityLevel (one of: low, medium, high, critical)
 - affectedCount (integer or null)
 - description (max 120 chars, anonymized — explicitly eliminate names, phone numbers)
@@ -77,12 +80,16 @@ If a field cannot be mathematically determined for a specific object, inject nul
         String severityStr = struct['severityLevel']?.toString().toLowerCase() ?? '';
         SeverityLevel sLevel = SeverityLevel.values.firstWhere((e) => e.name == severityStr, orElse: () => SeverityLevel.low);
 
+        double lat = (struct['latitude'] as num?)?.toDouble() ?? 13.0827;
+        double lng = (struct['longitude'] as num?)?.toDouble() ?? 80.2707;
+
         multiCards.add(ProblemCard(
           id: '${upload.id}_$nodeIndex', // Structural mapping with index suffix appending
           ngoId: upload.ngoId,
           issueType: iType,
           locationWard: struct['locationWard'] ?? 'Unknown Ward',
           locationCity: struct['locationCity'] ?? 'Unknown City',
+          locationGeoPoint: GeoPoint(lat, lng),
           severityLevel: sLevel,
           affectedCount: struct['affectedCount'] ?? 0,
           description: struct['description'] ?? 'Extracted organically without valid descriptions.',
