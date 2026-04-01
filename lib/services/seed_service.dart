@@ -16,11 +16,14 @@ class SeedService {
         id: 'seed_task_1',
         problemCardId: 'seed_problem_1',
         taskType: TaskType.community_outreach,
+        description: 'Conduct a community outreach and awareness session locally.',
         skillTags: ['communication', 'local_language'],
         estimatedVolunteers: 5,
         estimatedDurationHours: 4.5,
         status: TaskStatus.open,
         assignedVolunteerIds: [],
+        locationWard: 'Seed Ward',
+        locationGeoPoint: const GeoPoint(13.0827, 80.2707),
       );
 
       await _db.collection('tasks').doc(task1.id).set(task1.toJson());

@@ -15,19 +15,23 @@ class ExtractionService {
     try {
       final response = await http.get(Uri.parse(upload.cloudinaryUrl));
       if (response.statusCode != 200) {
-        throw Exception('Physical Cloudinary intercept failed: ${response.statusCode}');
+        throw Exception(
+          'Physical Cloudinary intercept failed: ${response.statusCode}',
+        );
       }
       final bytes = response.bodyBytes;
 
       // Ensure extension captures accurate extraction mechanisms
       final String uriList = upload.cloudinaryUrl.toLowerCase();
-      
+
       // 1. PDF Architecture Parsing
       if (uriList.contains('.pdf')) {
         final document = PdfDocument(inputBytes: bytes);
         final String text = PdfTextExtractor(document).extractText();
         document.dispose();
-        if (text.trim().isEmpty) return "FALLBACK_TO_GEMINI_IMAGE"; // Might be scanned image inside PDF
+        if (text.trim().isEmpty) {
+          return "FALLBACK_TO_GEMINI_IMAGE"; // Might be scanned image inside PDF
+        }
         return text;
       }
 
@@ -35,7 +39,9 @@ class ExtractionService {
       if (upload.fileType == 'csv' || uriList.contains('.csv')) {
         final csvString = utf8.decode(bytes, allowMalformed: true);
         final rows = const CsvToListConverter().convert(csvString);
-        return jsonEncode(rows); // Natively encode nested geometric array mathematically
+        return jsonEncode(
+          rows,
+        ); // Natively encode nested geometric array mathematically
       }
 
       // 3. Excel Array Mapping
@@ -44,14 +50,19 @@ class ExtractionService {
         final List<List<dynamic>> excelRows = [];
         for (var table in excel.tables.keys) {
           for (var row in excel.tables[table]!.rows) {
-            excelRows.add(row.map((cell) => cell?.value?.toString() ?? '').toList());
+            excelRows.add(
+              row.map((cell) => cell?.value?.toString() ?? '').toList(),
+            );
           }
         }
         return jsonEncode(excelRows); // Native Array injection mapping
       }
 
       // 4. Native Engine ML Kit OCR (Android/iOS)
-      if (upload.fileType == 'image' || uriList.contains('.jpg') || uriList.contains('.png') || uriList.contains('.jpeg')) {
+      if (upload.fileType == 'image' ||
+          uriList.contains('.jpg') ||
+          uriList.contains('.png') ||
+          uriList.contains('.jpeg')) {
         if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
           // You explicitly instructed: fallback onto Gemini if platform rejects ML Kit!
           return "FALLBACK_TO_GEMINI_IMAGE";
@@ -62,12 +73,18 @@ class ExtractionService {
         await tempFile.writeAsBytes(bytes);
 
         final inputImage = InputImage.fromFile(tempFile);
-        final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-        
-        final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+        final textRecognizer = TextRecognizer(
+          script: TextRecognitionScript.latin,
+        );
+
+        final RecognizedText recognizedText = await textRecognizer.processImage(
+          inputImage,
+        );
         await textRecognizer.close();
-        
-        if (recognizedText.text.trim().isEmpty) return "FALLBACK_TO_GEMINI_IMAGE";
+
+        if (recognizedText.text.trim().isEmpty) {
+          return "FALLBACK_TO_GEMINI_IMAGE";
+        }
         return recognizedText.text;
       }
 

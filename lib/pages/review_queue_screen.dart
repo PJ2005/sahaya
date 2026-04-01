@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/problem_card.dart';
+import '../models/raw_upload.dart';
 import '../components/review_card_dialog.dart';
+import '../components/list_shimmer.dart';
+import 'manual_entry_form.dart';
 
 class ReviewQueueScreen extends StatelessWidget {
   final String ngoId;
@@ -24,7 +27,13 @@ class ReviewQueueScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: ngoId)
-            .where('status', isEqualTo: 'pending_review') // Only generic Drafts
+            .where(
+              'status',
+              whereIn: [
+                ProblemStatus.pending_review.name,
+                ProblemStatus.extraction_failed.name,
+              ],
+            )
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -36,7 +45,7 @@ class ReviewQueueScreen extends StatelessWidget {
             );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const ListShimmer(itemCount: 6);
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -68,16 +77,42 @@ class ReviewQueueScreen extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
-              final struct = ProblemCard.fromJson({
-                ...data,
-                'id': docs[index].id,
-              });
+              final struct = () {
+                try {
+                  return ProblemCard.fromJson({...data, 'id': docs[index].id});
+                } catch (_) {
+                  return ProblemCard(
+                    id: docs[index].id,
+                    ngoId: data['ngoId'] as String? ?? ngoId,
+                    issueType: IssueType.other,
+                    locationWard: 'Manual Review Required',
+                    locationCity: 'Manual Review Required',
+                    locationGeoPoint: const GeoPoint(0, 0),
+                    severityLevel: SeverityLevel.medium,
+                    affectedCount: 0,
+                    description:
+                        'Extraction failed for this upload. Please complete manual entry.',
+                    confidenceScore: 0,
+                    status: ProblemStatus.extraction_failed,
+                    priorityScore: 0,
+                    severityContrib: 0,
+                    scaleContrib: 0,
+                    recencyContrib: 0,
+                    gapContrib: 0,
+                    createdAt: DateTime.now(),
+                    anonymized: true,
+                  );
+                }
+              }();
+              final isExtractionFailed =
+                  struct.status == ProblemStatus.extraction_failed;
 
               Color confidenceColor = Colors.green;
               if (struct.confidenceScore < 0.70) {
                 confidenceColor = Colors.red;
-              } else if (struct.confidenceScore <= 0.85)
+              } else if (struct.confidenceScore <= 0.85) {
                 confidenceColor = Colors.orange;
+              }
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -114,7 +149,9 @@ class ReviewQueueScreen extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    "${struct.locationWard}, ${struct.locationCity}\nSeverity: ${struct.severityLevel.name.toUpperCase()}",
+                    isExtractionFailed
+                        ? 'Manual entry required before approval'
+                        : "${struct.locationWard}, ${struct.locationCity}\nSeverity: ${struct.severityLevel.name.toUpperCase()}",
                     style: const TextStyle(fontSize: 12),
                   ),
                   trailing: const Icon(
@@ -122,7 +159,39 @@ class ReviewQueueScreen extends StatelessWidget {
                     size: 16,
                     color: Colors.blueAccent,
                   ),
-                  onTap: () {
+                  onTap: () async {
+                    if (isExtractionFailed) {
+                      final rawDoc = await FirebaseFirestore.instance
+                          .collection('raw_uploads')
+                          .doc(struct.id)
+                          .get();
+                      if (!context.mounted) return;
+
+                      if (!rawDoc.exists || rawDoc.data() == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Raw upload not found for manual entry.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final upload = RawUpload.fromJson({
+                        ...rawDoc.data()!,
+                        'id': rawDoc.id,
+                      });
+
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => ManualEntryFormDialog(upload: upload),
+                      );
+                      return;
+                    }
+
                     showDialog(
                       context: context,
                       builder: (_) => ReviewCardDialog(draftCard: struct),

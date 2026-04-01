@@ -6,15 +6,20 @@ import 'dart:io';
 import 'app.dart';
 import 'flavors.dart';
 import 'firebase_options_volunteer.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 const bool useEmulator = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // Continue without dotenv to keep app booting; feature code will show
+    // clear configuration errors where env values are required.
+  }
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   if (useEmulator) {
     String host = Platform.isAndroid ? '10.0.2.2' : '127.0.0.1';
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);

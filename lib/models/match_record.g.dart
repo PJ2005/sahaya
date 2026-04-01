@@ -29,8 +29,8 @@ _MatchRecord _$MatchRecordFromJson(Map<String, dynamic> json) => _MatchRecord(
   volunteerId: json['volunteerId'] as String,
   matchScore: (json['matchScore'] as num).toDouble(),
   status: $enumDecode(_$MatchStatusEnumMap, json['status']),
-  missionBriefing: json['missionBriefing'] as String,
-  whatToBring: json['whatToBring'] as String,
+  missionBriefing: json['missionBriefing'] as String? ?? '',
+  whatToBring: json['whatToBring'] as String? ?? '',
   proof: json['proof'] == null
       ? null
       : ProofObject.fromJson(json['proof'] as Map<String, dynamic>),

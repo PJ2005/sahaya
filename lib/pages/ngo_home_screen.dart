@@ -3,10 +3,73 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/problem_card.dart';
 import '../components/ai_assistant_sheet.dart';
 import '../components/ai_batch_task_sheet.dart';
+import '../components/list_shimmer.dart';
+import 'proof_review_screen.dart';
+import 'ngo_impact_dashboard_screen.dart';
 
 class NgoHomeScreen extends StatelessWidget {
   final String ngoId;
   const NgoHomeScreen({super.key, required this.ngoId});
+
+  ProblemCard _safeProblemCardFromDoc(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    final issueTypeName = (data['issueType'] as String?) ?? 'other';
+    final severityName = (data['severityLevel'] as String?) ?? 'medium';
+    final statusName = (data['status'] as String?) ?? 'approved';
+
+    final issueType = IssueType.values.firstWhere(
+      (v) => v.name == issueTypeName,
+      orElse: () => IssueType.other,
+    );
+    final severity = SeverityLevel.values.firstWhere(
+      (v) => v.name == severityName,
+      orElse: () => SeverityLevel.medium,
+    );
+    final status = ProblemStatus.values.firstWhere(
+      (v) => v.name == statusName,
+      orElse: () => ProblemStatus.approved,
+    );
+
+    final geoPoint = data['locationGeoPoint'] is GeoPoint
+        ? data['locationGeoPoint'] as GeoPoint
+        : const GeoPoint(0, 0);
+
+    final createdAt = data['createdAt'] is Timestamp
+        ? (data['createdAt'] as Timestamp).toDate()
+        : DateTime.now();
+
+    double asDouble(dynamic value, double fallback) {
+      if (value is num) return value.toDouble();
+      return fallback;
+    }
+
+    int asInt(dynamic value, int fallback) {
+      if (value is num) return value.toInt();
+      return fallback;
+    }
+
+    return ProblemCard(
+      id: doc.id,
+      ngoId: (data['ngoId'] as String?) ?? ngoId,
+      issueType: issueType,
+      locationWard: (data['locationWard'] as String?) ?? 'Unknown Ward',
+      locationCity: (data['locationCity'] as String?) ?? 'Unknown City',
+      locationGeoPoint: geoPoint,
+      severityLevel: severity,
+      affectedCount: asInt(data['affectedCount'], 0),
+      description: (data['description'] as String?) ?? '',
+      confidenceScore: asDouble(data['confidenceScore'], 0),
+      status: status,
+      priorityScore: asDouble(data['priorityScore'], 0),
+      severityContrib: asDouble(data['severityContrib'], 0),
+      scaleContrib: asDouble(data['scaleContrib'], 0),
+      recencyContrib: asDouble(data['recencyContrib'], 0),
+      gapContrib: asDouble(data['gapContrib'], 0),
+      createdAt: createdAt,
+      anonymized: (data['anonymized'] as bool?) ?? true,
+    );
+  }
 
   static const Map<String, Color> _issueColors = {
     'water_access': Color(0xFF2196F3),
@@ -37,6 +100,72 @@ class NgoHomeScreen extends StatelessWidget {
         foregroundColor: Colors.black87,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.insights_outlined),
+            tooltip: 'Impact Dashboard',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => NgoImpactDashboardScreen(ngoId: ngoId),
+                ),
+              );
+            },
+          ),
+          // Pending Proofs badge
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('match_records')
+                .where('status', isEqualTo: 'proof_submitted')
+                .snapshots(),
+            builder: (context, snap) {
+              final count = snap.data?.docs.length ?? 0;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.fact_check_outlined),
+                    tooltip: 'Pending Proofs',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProofReviewScreen(ngoId: ngoId),
+                        ),
+                      );
+                    },
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -55,7 +184,7 @@ class NgoHomeScreen extends StatelessWidget {
             );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const ListShimmer(itemCount: 6);
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -91,11 +220,7 @@ class NgoHomeScreen extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             itemCount: docs.length,
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final card = ProblemCard.fromJson({
-                ...data,
-                'id': docs[index].id,
-              });
+              final card = _safeProblemCardFromDoc(docs[index]);
               return _ProblemCardTile(
                 card: card,
                 issueColors: _issueColors,
@@ -360,14 +485,27 @@ class _TasksList extends StatelessWidget {
                     const Spacer(),
                     if (tasks.isNotEmpty)
                       TextButton.icon(
-                        onPressed: () => AiBatchTaskSheet.show(context, problemCardId: problemCardId, taskDocs: tasks),
+                        onPressed: () => AiBatchTaskSheet.show(
+                          context,
+                          problemCardId: problemCardId,
+                          taskDocs: tasks,
+                        ),
                         icon: ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]).createShader(bounds),
-                          child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                          ).createShader(bounds),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            size: 14,
+                            color: Colors.white,
+                          ),
                         ),
                         label: const Text(
                           'AI Refactor',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFF6366F1),
@@ -709,6 +847,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
 
     try {
       if (_isEditing) {
+        data['updatedAt'] = FieldValue.serverTimestamp();
         await FirebaseFirestore.instance
             .collection('tasks')
             .doc(widget.existingDocId)
@@ -716,6 +855,8 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
       } else {
         final docRef = FirebaseFirestore.instance.collection('tasks').doc();
         data['id'] = docRef.id;
+        data['createdAt'] = FieldValue.serverTimestamp();
+        data['updatedAt'] = FieldValue.serverTimestamp();
         await docRef.set(data);
       }
       if (mounted) {

@@ -6,9 +6,10 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/raw_upload.dart';
+import '../models/problem_card.dart';
 import '../services/gemini_service.dart';
-import 'manual_entry_form.dart';
 import 'package:uuid/uuid.dart';
+import '../components/list_shimmer.dart';
 
 class UploadScreen extends StatefulWidget {
   final String ngoId;
@@ -277,7 +278,7 @@ class _UploadScreenState extends State<UploadScreen>
           );
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const ListShimmer(itemCount: 5);
         }
 
         final docs = snapshot.data?.docs ?? [];
@@ -424,23 +425,46 @@ class _UploadScreenState extends State<UploadScreen>
                     if (!mounted) return;
                     Navigator.pop(context); // Close LLM generic loader visually
 
-                    // Mark as generic manual recovery fallback
+                    final bool invalidJson = e is GeminiInvalidJsonException;
+
+                    // Mark upload and review card as manual recovery fallback.
                     await FirebaseFirestore.instance
                         .collection('raw_uploads')
                         .doc(raw.id)
                         .update({'status': 'extraction_failed'});
 
-                    // Spawn explicit GUI Recovery form seamlessly wrapping physical context
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => ManualEntryFormDialog(upload: raw),
-                    );
+                    await FirebaseFirestore.instance
+                        .collection('problem_cards')
+                        .doc(raw.id)
+                        .set({
+                          'id': raw.id,
+                          'ngoId': raw.ngoId,
+                          'issueType': IssueType.other.name,
+                          'locationWard': 'Manual Review Required',
+                          'locationCity': 'Manual Review Required',
+                          'locationGeoPoint': const GeoPoint(0, 0),
+                          'severityLevel': SeverityLevel.medium.name,
+                          'affectedCount': 0,
+                          'description': invalidJson
+                              ? 'AI extraction returned invalid JSON. Manual entry required.'
+                              : 'AI extraction failed. Manual entry required.',
+                          'confidenceScore': 0.0,
+                          'status': ProblemStatus.extraction_failed.name,
+                          'priorityScore': 0.0,
+                          'severityContrib': 0.0,
+                          'scaleContrib': 0.0,
+                          'recencyContrib': 0.0,
+                          'gapContrib': 0.0,
+                          'createdAt': FieldValue.serverTimestamp(),
+                          'anonymized': true,
+                        },
+                        SetOptions(merge: true),
+                      );
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Gemini execution completely fractured! Invoking Recovery UI... ($e)',
+                          'Extraction failed. Open Review Queue for manual entry. ($e)',
                         ),
                         backgroundColor: Colors.orange,
                       ),

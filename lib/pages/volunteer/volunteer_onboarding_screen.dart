@@ -9,7 +9,8 @@ class VolunteerOnboardingScreen extends StatefulWidget {
   const VolunteerOnboardingScreen({super.key});
 
   @override
-  State<VolunteerOnboardingScreen> createState() => _VolunteerOnboardingScreenState();
+  State<VolunteerOnboardingScreen> createState() =>
+      _VolunteerOnboardingScreenState();
 }
 
 class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
@@ -24,32 +25,53 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
 
   // Step 2: Skills
   final List<String> _availableSkills = [
-    'communication', 'data_entry', 'transport', 'technical',
-    'medical', 'education', 'physical_labor', 'community_outreach'
+    'communication',
+    'data_entry',
+    'transport',
+    'technical',
+    'medical',
+    'education',
+    'physical_labor',
+    'community_outreach',
   ];
   final Set<String> _selectedSkills = {};
 
   // Step 3: Language
-  final List<String> _languages = ['Tamil', 'Telugu', 'Hindi', 'English', 'Other'];
+  final List<String> _languages = [
+    'Tamil',
+    'Telugu',
+    'Hindi',
+    'English',
+    'Other',
+  ];
   String? _selectedLanguage;
 
   bool _isSaving = false;
 
   void _nextPage() {
     if (_currentIndex == 0 && _currentLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please share your location to continue')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please share your location to continue')),
+      );
       return;
     }
     if (_currentIndex == 1 && _selectedSkills.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least one skill')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one skill')),
+      );
       return;
     }
-    
+
     if (_currentIndex < 2) {
-      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     } else {
       if (_selectedLanguage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a language preference')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a language preference')),
+        );
         return;
       }
       _completeOnboarding();
@@ -72,10 +94,14 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception('Location permissions are permanently denied, we cannot request permissions. Please enable them in app settings.');
+        throw Exception(
+          'Location permissions are permanently denied, we cannot request permissions. Please enable them in app settings.',
+        );
       }
 
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
       setState(() {
         _currentLocation = GeoPoint(position.latitude, position.longitude);
         _gettingLocation = false;
@@ -107,12 +133,20 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       );
 
       // Save to Firestore
-      await FirebaseFirestore.instance.collection('volunteer_profiles').doc(user.uid).set(profile.toJson());
+      await FirebaseFirestore.instance
+          .collection('volunteer_profiles')
+          .doc(user.uid)
+          .set(profile.toJson());
       // The gateway stream builder will automatically react to this document creation and route to VolunteerHome.
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save profile: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save profile: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -121,7 +155,13 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Volunteer Profile', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.blueAccent)),
+        title: const Text(
+          'Volunteer Profile',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Colors.blueAccent,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -134,7 +174,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
             backgroundColor: Colors.blue[50],
             valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
           ),
-          
+
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -151,29 +191,62 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
           // Bottom Bar Navigation
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))]),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (_currentIndex > 0)
                   TextButton(
-                    onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-                    child: const Text('Back', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    onPressed: () => _pageController.previousPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    ),
+                    child: const Text(
+                      'Back',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   )
                 else
                   const SizedBox.shrink(),
-                
+
                 ElevatedButton(
                   onPressed: _isSaving ? null : _nextPage,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: _isSaving 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(_currentIndex == 2 ? 'Complete Profile' : 'Continue', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          _currentIndex == 2 ? 'Complete Profile' : 'Continue',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                 ),
               ],
             ),
@@ -193,18 +266,35 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
         children: [
           const Icon(Icons.my_location, size: 64, color: Colors.blueAccent),
           const SizedBox(height: 24),
-          const Text('Where are you?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+          const Text(
+            'Where are you?',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 8),
-          const Text('We need your location to find nearby community needs.', textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+          const Text(
+            'We need your location to find nearby community needs.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black54),
+          ),
           const SizedBox(height: 32),
-          
+
           if (_currentLocation == null) ...[
             ElevatedButton.icon(
               onPressed: _gettingLocation ? null : _fetchLocation,
-              icon: _gettingLocation 
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.blueAccent, strokeWidth: 2))
+              icon: _gettingLocation
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.blueAccent,
+                        strokeWidth: 2,
+                      ),
+                    )
                   : const Icon(Icons.gps_fixed),
-              label: Text(_gettingLocation ? 'Finding you...' : 'Share My Location'),
+              label: Text(
+                _gettingLocation ? 'Finding you...' : 'Share My Location',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue[50],
                 foregroundColor: Colors.blueAccent,
@@ -215,23 +305,40 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
             if (_locationError != null)
               Padding(
                 padding: const EdgeInsets.only(top: 16),
-                child: Text(_locationError!, style: const TextStyle(color: Colors.red, fontSize: 12), textAlign: TextAlign.center),
+                child: Text(
+                  _locationError!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
               ),
           ] else ...[
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green[200]!)),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green[200]!),
+              ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.check_circle, color: Colors.green),
                   SizedBox(width: 12),
-                  Text('Location secured', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Location secured',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 32),
-            const Text('Match Radius', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Text(
+              'Match Radius',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
             Slider(
               value: _radiusKm,
               min: 5,
@@ -245,10 +352,13 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
                 Text('5km', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                Text('50km', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  '50km',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ],
             ),
-          ]
+          ],
         ],
       ),
     );
@@ -261,9 +371,15 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Your Skills', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const Text(
+            'Your Skills',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          const Text('Select tags that match your capabilities.', style: TextStyle(color: Colors.black54)),
+          const Text(
+            'Select tags that match your capabilities.',
+            style: TextStyle(color: Colors.black54),
+          ),
           const SizedBox(height: 24),
           Wrap(
             spacing: 10,
@@ -271,7 +387,13 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
             children: _availableSkills.map((skill) {
               final isSelected = _selectedSkills.contains(skill);
               return FilterChip(
-                label: Text(skill.replaceAll('_', ' '), style: TextStyle(color: isSelected ? Colors.white : Colors.blueAccent, fontWeight: FontWeight.w600)),
+                label: Text(
+                  skill.replaceAll('_', ' '),
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.blueAccent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 selected: isSelected,
                 onSelected: (selected) {
                   setState(() {
@@ -285,7 +407,12 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
                 backgroundColor: Colors.blue[50],
                 selectedColor: Colors.blueAccent,
                 checkmarkColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: isSelected ? Colors.transparent : Colors.blue[200]!)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSelected ? Colors.transparent : Colors.blue[200]!,
+                  ),
+                ),
               );
             }).toList(),
           ),
@@ -301,13 +428,22 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Preferred Language', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const Text(
+            'Preferred Language',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          const Text('Which language do you prefer to receive tasks in?', style: TextStyle(color: Colors.black54)),
+          const Text(
+            'Which language do you prefer to receive tasks in?',
+            style: TextStyle(color: Colors.black54),
+          ),
           const SizedBox(height: 24),
           ..._languages.map((lang) {
             return RadioListTile<String>(
-              title: Text(lang, style: const TextStyle(fontWeight: FontWeight.w600)),
+              title: Text(
+                lang,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               value: lang,
               groupValue: _selectedLanguage,
               onChanged: (val) => setState(() => _selectedLanguage = val),

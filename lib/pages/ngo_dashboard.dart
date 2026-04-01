@@ -34,7 +34,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: widget.ngoId)
-            .where('status', isEqualTo: 'pending_review')
+          .where('status', whereIn: ['pending_review', 'extraction_failed'])
             .snapshots(),
         builder: (context, snapshot) {
           final pendingCount = snapshot.data?.docs.length ?? 0;
@@ -46,12 +46,21 @@ class _NgoDashboardState extends State<NgoDashboard> {
             unselectedItemColor: Colors.black45,
             type: BottomNavigationBarType.fixed,
             items: [
-              const BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-              const BottomNavigationBarItem(icon: Icon(Icons.cloud_upload), label: 'Ingestion'),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard),
+                label: 'Dashboard',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.cloud_upload),
+                label: 'Ingestion',
+              ),
               BottomNavigationBarItem(
                 icon: Badge(
                   isLabelVisible: pendingCount > 0,
-                  label: Text('$pendingCount', style: const TextStyle(fontSize: 10)),
+                  label: Text(
+                    '$pendingCount',
+                    style: const TextStyle(fontSize: 10),
+                  ),
                   child: const Icon(Icons.fact_check),
                 ),
                 label: 'Review',

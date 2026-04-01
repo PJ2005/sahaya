@@ -25,7 +25,7 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
     try {
       final userFallback = FirebaseAuth.instance.currentUser;
       UserCredential? credential;
-      
+
       if (userFallback == null) {
         credential = await FirebaseAuth.instance.signInAnonymously();
         _uid = credential.user!.uid;
@@ -39,7 +39,13 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Auth failed: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red)
+          SnackBar(
+            content: Text(
+              'Auth failed: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -55,7 +61,10 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('Connecting to Sahaya...', style: TextStyle(color: Colors.grey)),
+              Text(
+                'Connecting to Sahaya...',
+                style: TextStyle(color: Colors.grey),
+              ),
             ],
           ),
         ),
@@ -63,28 +72,37 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
     }
 
     if (_uid == null) {
-      return const Scaffold(body: Center(child: Text('Authentication failed. Please restart.')));
+      return const Scaffold(
+        body: Center(child: Text('Authentication failed. Please restart.')),
+      );
     }
 
     return StreamBuilder<DocumentSnapshot>(
       // Listen to the volunteer profile
-      stream: FirebaseFirestore.instance.collection('volunteer_profiles').doc(_uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('volunteer_profiles')
+          .doc(_uid)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         if (snapshot.hasError) {
-          return Scaffold(body: Center(child: Text('Database Error: ${snapshot.error}')));
+          return Scaffold(
+            body: Center(child: Text('Database Error: ${snapshot.error}')),
+          );
         }
 
         // If the document doesn't exist, route to onboarding.
         // If it does, route to home.
         if (snapshot.hasData && snapshot.data!.exists) {
-           // We pass the uid so the home screen can load user-specific data
-           return VolunteerHomeScreen(uid: _uid!);
+          // We pass the uid so the home screen can load user-specific data
+          return VolunteerHomeScreen(uid: _uid!);
         } else {
-           return const VolunteerOnboardingScreen();
+          return const VolunteerOnboardingScreen();
         }
       },
     );

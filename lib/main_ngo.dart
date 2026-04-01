@@ -13,10 +13,8 @@ const bool useEmulator = false;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   if (useEmulator) {
     String host = Platform.isAndroid ? '10.0.2.2' : '127.0.0.1';
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);

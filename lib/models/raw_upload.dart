@@ -21,5 +21,6 @@ abstract class RawUpload with _$RawUpload {
     required UploadStatus status,
   }) = _RawUpload;
 
-  factory RawUpload.fromJson(Map<String, dynamic> json) => _$RawUploadFromJson(json);
+  factory RawUpload.fromJson(Map<String, dynamic> json) =>
+      _$RawUploadFromJson(json);
 }

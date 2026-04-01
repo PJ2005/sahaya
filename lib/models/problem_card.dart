@@ -6,8 +6,18 @@ import 'converters.dart';
 part 'problem_card.freezed.dart';
 part 'problem_card.g.dart';
 
-enum IssueType { water_access, sanitation, education, nutrition, healthcare, livelihood, other }
+enum IssueType {
+  water_access,
+  sanitation,
+  education,
+  nutrition,
+  healthcare,
+  livelihood,
+  other,
+}
+
 enum SeverityLevel { low, medium, high, critical }
+
 enum ProblemStatus { pending_review, approved, extraction_failed }
 
 @freezed
@@ -34,5 +44,6 @@ abstract class ProblemCard with _$ProblemCard {
     required bool anonymized,
   }) = _ProblemCard;
 
-  factory ProblemCard.fromJson(Map<String, dynamic> json) => _$ProblemCardFromJson(json);
+  factory ProblemCard.fromJson(Map<String, dynamic> json) =>
+      _$ProblemCardFromJson(json);
 }

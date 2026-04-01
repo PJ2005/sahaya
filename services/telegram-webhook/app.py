@@ -26,6 +26,7 @@ CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
 CLOUDINARY_UPLOAD_PRESET = os.getenv('CLOUDINARY_UPLOAD_PRESET')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+AZURE_NOTIFICATION_WEBHOOK_URL = os.getenv('AZURE_NOTIFICATION_WEBHOOK_URL', '')
 
 # Fallback specifically to the key the user verified exists locally!
 FIREBASE_CREDS_PATH = os.getenv('FIREBASE_CREDENTIALS', '../../sahaya-7df6d-firebase-adminsdk-fbsvc-8301c19701.json')
@@ -79,6 +80,64 @@ def send_telegram_message(chat_id, text):
     url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
     payload = {'chat_id': chat_id, 'text': text}
     requests.post(url, json=payload)
+
+
+def send_azure_notification(user_id, title, body, data=None):
+    """Best-effort Azure push relay. Returns True if webhook accepted request."""
+    if not AZURE_NOTIFICATION_WEBHOOK_URL:
+        return False
+
+    payload = {
+        'userId': user_id,
+        'title': title,
+        'body': body,
+        'data': data or {}
+    }
+
+    try:
+        resp = requests.post(
+            AZURE_NOTIFICATION_WEBHOOK_URL,
+            json=payload,
+            timeout=10,
+        )
+        if 200 <= resp.status_code < 300:
+            return True
+        print(f"Azure notification webhook rejected with {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"Azure notification webhook failed: {e}")
+
+    return False
+
+
+def generate_impact_statement(task_description, issue_type, affected_count, location_ward):
+    """Generates a concise one-line impact summary for approved proof records."""
+    fallback = (
+        f"This task improved {issue_type.replace('_', ' ')} outcomes for "
+        f"about {affected_count} people in {location_ward}."
+    )
+
+    if not GEMINI_API_KEY:
+        return fallback
+
+    prompt = (
+        "In one sentence, describe the community impact of this task: "
+        f"{task_description}, issue: {issue_type}, affected: {affected_count} "
+        f"people in {location_ward}."
+    )
+
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        # Keep model configurable for forward compatibility with Gemini model aliases.
+        model_name = os.getenv('IMPACT_GEMINI_MODEL', 'gemini-3-flash')
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        text = (response.text or '').strip()
+        if text:
+            return text
+    except Exception as e:
+        print(f"Impact statement generation failed: {e}")
+
+    return fallback
 
 def register_user(chat_id, ngo_id):
     """Links a physical Telegram chat directly to a structural NGO identity"""
@@ -280,7 +339,8 @@ def generate_tasks():
             'status': 'open',
             'assignedVolunteerIds': [],
             'locationWard': pc.get('locationWard', 'Unknown Ward'),
-            'locationGeoPoint': pc.get('locationGeoPoint')
+            'locationGeoPoint': pc.get('locationGeoPoint'),
+            'createdAt': firestore.SERVER_TIMESTAMP,
         }
 
         try:
@@ -410,6 +470,19 @@ def run_matching():
         matches.sort(key=lambda x: x['score'], reverse=True)
         top_matches = matches[:20]
         
+        # Generate whatToBring natively only once for this Task to avoid API limit bottleneck
+        what_to_bring_text = "Standard volunteering gear and enthusiasm."
+        try:
+            if GEMINI_API_KEY:
+                genai.configure(api_key=GEMINI_API_KEY)
+                model = genai.GenerativeModel('gemini-flash-lite-latest')
+                bring_prompt = f"In one sentence, what should a volunteer bring or prepare for this task type: {task_data.get('taskType', 'other')}, skill tags: {task_skills}?"
+                bring_resp = model.generate_content(bring_prompt)
+                if bring_resp and bring_resp.text:
+                    what_to_bring_text = bring_resp.text.strip()
+        except Exception as e:
+            print(f"Gemini whatToBring prompt failed: {e}")
+
         batch = db.batch()
         for m in top_matches:
              match_id = str(uuid.uuid4())
@@ -420,6 +493,8 @@ def run_matching():
                  'volunteerId': m['volunteerId'],
                  'matchScore': m['score'],
                  'status': 'open',
+                 'missionBriefing': task_data.get('description', 'Mission Briefing'),
+                 'whatToBring': what_to_bring_text,
                  'createdAt': firestore.SERVER_TIMESTAMP
              })
              
@@ -513,6 +588,266 @@ scheduler = BackgroundScheduler()
 # 12:30 UTC = 18:00 IST (5 hrs 30 mins ahead) everyday on 'fri'
 scheduler.add_job(func=scheduled_weekly_reminder, trigger="cron", day_of_week='fri', hour=12, minute=30)
 scheduler.start()
+
+@app.route('/notify-proof-submitted', methods=['POST'])
+def notify_proof_submitted():
+    """Reads MatchRecord + Task, writes a notification doc for the NGO admin."""
+    data = request.json
+    if not data or 'matchRecordId' not in data:
+        return jsonify({'error': 'Missing matchRecordId'}), 400
+
+    match_record_id = data['matchRecordId']
+
+    try:
+        # 1. Read MatchRecord
+        mr_doc = db.collection('match_records').document(match_record_id).get()
+        if not mr_doc.exists:
+            return jsonify({'error': 'MatchRecord not found'}), 404
+        mr_data = mr_doc.to_dict()
+
+        # 2. Read parent Task
+        task_id = mr_data.get('taskId', '')
+        task_doc = db.collection('tasks').document(task_id).get()
+        task_desc = 'Unknown Task'
+        ngo_id = None
+        if task_doc.exists:
+            task_data = task_doc.to_dict()
+            task_desc = task_data.get('description', 'Volunteer Task')
+            # Get NGO via ProblemCard
+            pc_id = task_data.get('problemCardId', '')
+            if pc_id:
+                pc_doc = db.collection('problem_cards').document(pc_id).get()
+                if pc_doc.exists:
+                    ngo_id = pc_doc.to_dict().get('ngoId')
+
+        # 3. Write notification to Firestore (workaround for missing FCM on NGO side)
+        notif_id = str(uuid.uuid4())
+        notif_doc = {
+            'id': notif_id,
+            'ngoId': ngo_id or 'unknown',
+            'type': 'proof_submitted',
+            'matchRecordId': match_record_id,
+            'taskId': task_id,
+            'message': f'Proof submitted for: {task_desc} — tap to review.',
+            'read': False,
+            'createdAt': firestore.SERVER_TIMESTAMP
+        }
+        db.collection('ngo_notifications').document(notif_id).set(notif_doc)
+        print(f"NGO notification written for proof on match {match_record_id}")
+
+        return jsonify({'status': 'success', 'notificationId': notif_id}), 200
+
+    except Exception as e:
+        print(f"notify-proof-submitted failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/complete-task', methods=['POST'])
+def complete_task():
+    """Called when NGO approves proof. Advances task/problem completion counters and statuses."""
+    data = request.json
+    if not data or 'matchRecordId' not in data:
+        return jsonify({'error': 'Missing matchRecordId'}), 400
+
+    match_record_id = data['matchRecordId']
+
+    try:
+        mr_ref = db.collection('match_records').document(match_record_id)
+        mr_doc = mr_ref.get()
+        if not mr_doc.exists:
+            return jsonify({'error': 'MatchRecord not found'}), 404
+        mr_data = mr_doc.to_dict()
+        task_id = mr_data.get('taskId', '')
+
+        if not task_id:
+            return jsonify({'error': 'MatchRecord missing taskId'}), 400
+
+        if mr_data.get('status') != 'proof_approved':
+            return jsonify({'error': 'MatchRecord must be proof_approved before completion cascade'}), 409
+
+        # Idempotency guard so retries do not inflate completionCount.
+        if mr_data.get('completionCascadeProcessed') is True:
+            return jsonify({
+                'status': 'success',
+                'taskId': task_id,
+                'alreadyProcessed': True,
+                'impactStatement': mr_data.get('impactStatement', ''),
+            }), 200
+
+        task_ref = db.collection('tasks').document(task_id)
+        task_doc = task_ref.get()
+        if not task_doc.exists:
+            return jsonify({'error': 'Task not found'}), 404
+
+        task_data = task_doc.to_dict()
+        problem_card_id = task_data.get('problemCardId', '')
+
+        issue_type = 'other'
+        affected_count = 0
+        location_ward = task_data.get('locationWard', 'Unknown Ward')
+        if problem_card_id:
+            pc_doc = db.collection('problem_cards').document(problem_card_id).get()
+            if pc_doc.exists:
+                pc_data = pc_doc.to_dict()
+                issue_type = pc_data.get('issueType', issue_type)
+                affected_count = int(pc_data.get('affectedCount', 0) or 0)
+                location_ward = pc_data.get('locationWard', location_ward)
+
+        impact_statement = generate_impact_statement(
+            task_data.get('description', 'Community task'),
+            issue_type,
+            affected_count,
+            location_ward,
+        )
+
+        current_completion_count = int(task_data.get('completionCount', 0) or 0)
+        new_completion_count = current_completion_count + 1
+
+        assigned_ids = task_data.get('assignedVolunteerIds') or []
+        assigned_count = len(assigned_ids)
+
+        estimated_volunteers = int(task_data.get('estimatedVolunteers', 0) or 0)
+        if estimated_volunteers <= 0:
+            estimated_volunteers = max(assigned_count, 1)
+
+        should_mark_task_done = (
+            assigned_count >= estimated_volunteers and
+            new_completion_count >= estimated_volunteers
+        )
+
+        task_updates = {
+            'completionCount': new_completion_count,
+            'updatedAt': firestore.SERVER_TIMESTAMP,
+        }
+        if should_mark_task_done:
+            task_updates['status'] = 'done'
+            task_updates['completedAt'] = firestore.SERVER_TIMESTAMP
+
+        task_ref.update(task_updates)
+        mr_ref.update({
+            'completionCascadeProcessed': True,
+            'completionCascadeProcessedAt': firestore.SERVER_TIMESTAMP,
+            'impactStatement': impact_statement,
+        })
+
+        task_done = should_mark_task_done
+        problem_resolved = False
+
+        if task_done and problem_card_id:
+            sibling_tasks = db.collection('tasks').where('problemCardId', '==', problem_card_id).stream()
+            sibling_task_docs = [doc.to_dict() for doc in sibling_tasks]
+            all_done = bool(sibling_task_docs) and all((t.get('status') == 'done') for t in sibling_task_docs)
+
+            if all_done:
+                db.collection('problem_cards').document(problem_card_id).update({
+                    'status': 'resolved',
+                    'resolvedAt': firestore.SERVER_TIMESTAMP,
+                })
+                problem_resolved = True
+
+        return jsonify({
+            'status': 'success',
+            'taskId': task_id,
+            'taskCompleted': task_done,
+            'completionCount': new_completion_count,
+            'estimatedVolunteers': estimated_volunteers,
+            'assignedVolunteerCount': assigned_count,
+            'problemCardResolved': problem_resolved,
+            'impactStatement': impact_statement,
+        }), 200
+
+    except Exception as e:
+        print(f"complete-task failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/notify-proof-rejected', methods=['POST'])
+def notify_proof_rejected():
+    """Notifies volunteer that proof was rejected via Azure relay + Firestore in-app fallback."""
+    data = request.json
+    if not data or 'matchRecordId' not in data:
+        return jsonify({'error': 'Missing matchRecordId'}), 400
+
+    match_record_id = data['matchRecordId']
+
+    try:
+        mr_doc = db.collection('match_records').document(match_record_id).get()
+        if not mr_doc.exists:
+            return jsonify({'error': 'MatchRecord not found'}), 404
+        mr_data = mr_doc.to_dict()
+        volunteer_id = mr_data.get('volunteerId', '')
+        reason = mr_data.get('adminReviewNote', 'No reason provided')
+
+        if not volunteer_id:
+            return jsonify({'error': 'MatchRecord missing volunteerId'}), 400
+
+        task_id = mr_data.get('taskId', '')
+        message = f"Your proof was not accepted - {reason}. Please resubmit."
+
+        # Always write in-app notification document so Flutter can route without FCM.
+        notif_id = str(uuid.uuid4())
+        notif_doc = {
+            'id': notif_id,
+            'volunteerId': volunteer_id,
+            'type': 'proof_rejected',
+            'matchRecordId': match_record_id,
+            'taskId': task_id,
+            'message': message,
+            'adminReviewNote': reason,
+            'route': {
+                'screen': 'active_task',
+                'reopenProofSheet': True,
+            },
+            'read': False,
+            'createdAt': firestore.SERVER_TIMESTAMP,
+        }
+        db.collection('volunteer_notifications').document(notif_id).set(notif_doc)
+
+        azure_sent = send_azure_notification(
+            volunteer_id,
+            'Proof needs revision',
+            message,
+            {
+                'type': 'proof_rejected',
+                'matchRecordId': match_record_id,
+                'taskId': task_id,
+                'reopenProofSheet': True,
+            }
+        )
+
+        # Optional fallback for environments still configured with Firebase push tokens.
+        fcm_sent = False
+        vol_doc = db.collection('volunteer_profiles').document(volunteer_id).get()
+        if vol_doc.exists:
+            fcm_token = vol_doc.to_dict().get('fcmToken')
+            if fcm_token:
+                try:
+                    msg = messaging.Message(
+                        notification=messaging.Notification(
+                            title="Proof needs revision",
+                            body=message,
+                        ),
+                        data={
+                            'type': 'proof_rejected',
+                            'matchRecordId': match_record_id,
+                            'taskId': task_id,
+                            'reopenProofSheet': 'true',
+                        },
+                        token=fcm_token,
+                    )
+                    messaging.send(msg)
+                    fcm_sent = True
+                except Exception as e:
+                    print(f"FCM send to volunteer failed: {e}")
+
+        return jsonify({
+            'status': 'success',
+            'notificationId': notif_id,
+            'azureSent': azure_sent,
+            'fcmSent': fcm_sent,
+        }), 200
+
+    except Exception as e:
+        print(f"notify-proof-rejected failed: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(port=5000, host='0.0.0.0', debug=True)

@@ -21,5 +21,6 @@ abstract class VolunteerProfile with _$VolunteerProfile {
     String? fcmToken,
   }) = _VolunteerProfile;
 
-  factory VolunteerProfile.fromJson(Map<String, dynamic> json) => _$VolunteerProfileFromJson(json);
+  factory VolunteerProfile.fromJson(Map<String, dynamic> json) =>
+      _$VolunteerProfileFromJson(json);
 }

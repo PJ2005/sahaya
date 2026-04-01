@@ -9,42 +9,41 @@ service cloud.firestore {
 
     match /users/{userId} {
       // Basic rule for the user schema we created earlier
-      allow read, write: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
-      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.uid;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
     }
 
     match /problem_cards/{cardId} {
-      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
-    }
-
-    match /tasks/{taskId} {
-      // Volunteers need to read tasks to get matched
-      allow read: if isAuthenticated(); 
+      allow read: if isAuthenticated();
       allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
     }
 
+    match /tasks/{taskId} {
+      allow read, update, create, delete: if isAuthenticated();
+    }
     match /volunteer_profiles/{profileId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == profileId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
     }
 
     match /match_records/{matchId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.volunteerId ||
-        request.auth.uid == get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.ngoId
-      );
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && (
         request.auth.uid == resource.data.volunteerId ||
-        request.auth.uid == get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.ngoId
+        request.auth.uid == get(/databases/$(database)/documents/problem_cards/$(get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.problemCardId)).data.ngoId
       );
     }
     
     match /raw_uploads/{uploadId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
+    }
+
+    match /volunteer_notifications/{notificationId} {
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.volunteerId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.volunteerId;
     }
   }
 }

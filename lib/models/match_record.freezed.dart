@@ -505,7 +505,7 @@ return $default(_that.id,_that.taskId,_that.volunteerId,_that.matchScore,_that.s
 @JsonSerializable()
 
 class _MatchRecord extends MatchRecord {
-  const _MatchRecord({required this.id, required this.taskId, required this.volunteerId, required this.matchScore, required this.status, required this.missionBriefing, required this.whatToBring, this.proof, this.adminReviewNote, @OptionalTimestampConverter() this.completedAt}): super._();
+  const _MatchRecord({required this.id, required this.taskId, required this.volunteerId, required this.matchScore, required this.status, this.missionBriefing = '', this.whatToBring = '', this.proof, this.adminReviewNote, @OptionalTimestampConverter() this.completedAt}): super._();
   factory _MatchRecord.fromJson(Map<String, dynamic> json) => _$MatchRecordFromJson(json);
 
 @override final  String id;
@@ -513,8 +513,8 @@ class _MatchRecord extends MatchRecord {
 @override final  String volunteerId;
 @override final  double matchScore;
 @override final  MatchStatus status;
-@override final  String missionBriefing;
-@override final  String whatToBring;
+@override@JsonKey() final  String missionBriefing;
+@override@JsonKey() final  String whatToBring;
 @override final  ProofObject? proof;
 @override final  String? adminReviewNote;
 @override@OptionalTimestampConverter() final  DateTime? completedAt;

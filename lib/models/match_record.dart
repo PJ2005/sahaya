@@ -6,7 +6,14 @@ import 'converters.dart';
 part 'match_record.freezed.dart';
 part 'match_record.g.dart';
 
-enum MatchStatus { open, accepted, proof_submitted, proof_approved, proof_rejected, completed }
+enum MatchStatus {
+  open,
+  accepted,
+  proof_submitted,
+  proof_approved,
+  proof_rejected,
+  completed,
+}
 
 @freezed
 abstract class ProofObject with _$ProofObject {
@@ -17,7 +24,8 @@ abstract class ProofObject with _$ProofObject {
     @TimestampConverter() required DateTime submittedAt,
   }) = _ProofObject;
 
-  factory ProofObject.fromJson(Map<String, dynamic> json) => _$ProofObjectFromJson(json);
+  factory ProofObject.fromJson(Map<String, dynamic> json) =>
+      _$ProofObjectFromJson(json);
 }
 
 @freezed
@@ -29,12 +37,13 @@ abstract class MatchRecord with _$MatchRecord {
     required String volunteerId,
     required double matchScore,
     required MatchStatus status,
-    required String missionBriefing,
-    required String whatToBring,
+    @Default('') String missionBriefing,
+    @Default('') String whatToBring,
     ProofObject? proof,
     String? adminReviewNote,
     @OptionalTimestampConverter() DateTime? completedAt,
   }) = _MatchRecord;
 
-  factory MatchRecord.fromJson(Map<String, dynamic> json) => _$MatchRecordFromJson(json);
+  factory MatchRecord.fromJson(Map<String, dynamic> json) =>
+      _$MatchRecordFromJson(json);
 }

@@ -5,7 +5,8 @@ import '../services/gemini_service.dart';
 /// The AI processes the request and returns modified data via [onResult].
 class AiAssistantSheet extends StatefulWidget {
   final Map<String, dynamic> currentData;
-  final String contextDescription; // e.g. "a volunteer task" or "an extracted problem card"
+  final String
+  contextDescription; // e.g. "a volunteer task" or "an extracted problem card"
   final void Function(Map<String, dynamic> modifiedData) onResult;
 
   const AiAssistantSheet({
@@ -90,7 +91,14 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
           children: [
             // Handle bar
             Center(
-              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -98,18 +106,33 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('AI Assistant', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                      Text('Describe what you want changed', style: TextStyle(fontSize: 11, color: Colors.black45)),
+                      Text(
+                        'AI Assistant',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        'Describe what you want changed',
+                        style: TextStyle(fontSize: 11, color: Colors.black45),
+                      ),
                     ],
                   ),
                 ),
@@ -124,14 +147,30 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: 'e.g. "Change severity to critical and update the description"',
-                      hintStyle: const TextStyle(fontSize: 12, color: Colors.black26),
+                      hintText:
+                          'e.g. "Change severity to critical and update the description"',
+                      hintStyle: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black26,
+                      ),
                       filled: true,
                       fillColor: Colors.grey[50],
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6366F1))),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      ),
                     ),
                     style: const TextStyle(fontSize: 13),
                     maxLines: 3,
@@ -150,8 +189,19 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: _loading
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                     ),
                   ),
                 ),
@@ -161,7 +211,10 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
             // Error
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text('Error: $_error', style: const TextStyle(fontSize: 11, color: Colors.red)),
+              Text(
+                'Error: $_error',
+                style: const TextStyle(fontSize: 11, color: Colors.red),
+              ),
             ],
 
             // Preview
@@ -181,40 +234,84 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                       children: [
                         Icon(Icons.check_circle, color: Colors.green, size: 16),
                         SizedBox(width: 6),
-                        Text('AI Suggestion Preview', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.green)),
+                        Text(
+                          'AI Suggestion Preview',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: Colors.green,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ..._preview!.entries.where((e) {
-                      // Only show fields that changed
-                      final original = widget.currentData[e.key];
-                      return original?.toString() != e.value?.toString();
-                    }).map((e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(fontSize: 12, color: Colors.black87),
-                          children: [
-                            TextSpan(text: '${e.key}: ', style: const TextStyle(fontWeight: FontWeight.w700)),
-                            TextSpan(
-                              text: '${widget.currentData[e.key]}',
-                              style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.red),
+                    ..._preview!.entries
+                        .where((e) {
+                          // Only show fields that changed
+                          final original = widget.currentData[e.key];
+                          return original?.toString() != e.value?.toString();
+                        })
+                        .map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black87,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: '${e.key}: ',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '${widget.currentData[e.key]}',
+                                    style: const TextStyle(
+                                      decoration: TextDecoration.lineThrough,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  const TextSpan(text: ' → '),
+                                  TextSpan(
+                                    text: '${e.value}',
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const TextSpan(text: ' → '),
-                            TextSpan(text: '${e.value}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
-                          ],
+                          ),
+                        ),
+                    if (_preview!.entries
+                        .where(
+                          (e) =>
+                              widget.currentData[e.key]?.toString() !=
+                              e.value?.toString(),
+                        )
+                        .isEmpty)
+                      const Text(
+                        'No changes detected.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.black38,
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
-                    )),
-                    if (_preview!.entries.where((e) => widget.currentData[e.key]?.toString() != e.value?.toString()).isEmpty)
-                      const Text('No changes detected.', style: TextStyle(fontSize: 11, color: Colors.black38, fontStyle: FontStyle.italic)),
                     const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
                           onPressed: () => setState(() => _preview = null),
-                          child: const Text('Discard', style: TextStyle(color: Colors.red, fontSize: 12)),
+                          child: const Text(
+                            'Discard',
+                            style: TextStyle(color: Colors.red, fontSize: 12),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
@@ -223,8 +320,17 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                             Navigator.pop(context);
                           },
                           icon: const Icon(Icons.check, size: 16),
-                          label: const Text('Apply Changes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                          label: const Text(
+                            'Apply Changes',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                     ),

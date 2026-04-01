@@ -5,7 +5,7 @@ class UserModel {
   final String email;
   final String name;
   final UserRole role;
-  
+
   UserModel({
     required this.uid,
     required this.email,
@@ -14,12 +14,7 @@ class UserModel {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      'uid': uid,
-      'email': email,
-      'name': name,
-      'role': role.name,
-    };
+    return {'uid': uid, 'email': email, 'name': name, 'role': role.name};
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -27,7 +22,10 @@ class UserModel {
       uid: documentId,
       email: map['email'] ?? '',
       name: map['name'] ?? '',
-      role: UserRole.values.firstWhere((e) => e.name == map['role'], orElse: () => UserRole.volunteer),
+      role: UserRole.values.firstWhere(
+        (e) => e.name == map['role'],
+        orElse: () => UserRole.volunteer,
+      ),
     );
   }
 }

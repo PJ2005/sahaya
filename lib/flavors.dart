@@ -1,7 +1,4 @@
-enum Flavor {
-  ngo,
-  volunteer,
-}
+enum Flavor { ngo, volunteer }
 
 class F {
   static late final Flavor appFlavor;
@@ -16,5 +13,4 @@ class F {
         return 'Sahaya Volunteer';
     }
   }
-
 }
