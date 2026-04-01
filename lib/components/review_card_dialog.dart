@@ -196,11 +196,11 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
             if (widget.draftCard.confidenceScore < 0.70)
               Container(
                 color: Colors.amber[100],
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.amber),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Row(
                   children: [

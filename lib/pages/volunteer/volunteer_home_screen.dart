@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:async';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/volunteer_profile.dart';
 import '../../models/task_model.dart';
-import '../../components/list_shimmer.dart';
+import '../../theme/sahaya_theme.dart';
+import '../../app.dart';
 import 'task_details_screen.dart';
 import 'active_task_screen.dart';
 
 class VolunteerHomeScreen extends StatefulWidget {
   final String uid;
-
   const VolunteerHomeScreen({super.key, required this.uid});
 
   @override
@@ -20,8 +20,6 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  StreamSubscription<QuerySnapshot>? _proofRejectedSubscription;
-  final Set<String> _handledNotificationIds = <String>{};
 
   @override
   void initState() {
@@ -30,133 +28,15 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.04).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
-    _startProofRejectedListener();
   }
 
   @override
   void dispose() {
-    _proofRejectedSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
-  }
-
-  void _startProofRejectedListener() {
-    _proofRejectedSubscription = FirebaseFirestore.instance
-        .collection('volunteer_notifications')
-        .where('volunteerId', isEqualTo: widget.uid)
-        .snapshots()
-        .listen((snapshot) async {
-          if (!mounted) return;
-
-          for (final doc in snapshot.docs) {
-            if (_handledNotificationIds.contains(doc.id)) {
-              continue;
-            }
-
-            final data = doc.data();
-            final isRead = data['read'] == true;
-            final type = (data['type'] as String? ?? '').trim();
-            if (isRead || type != 'proof_rejected') {
-              continue;
-            }
-
-            final matchRecordId = data['matchRecordId'] as String? ?? '';
-            final note = data['adminReviewNote'] as String? ?? '';
-            if (matchRecordId.isEmpty) {
-              continue;
-            }
-
-            _handledNotificationIds.add(doc.id);
-
-            try {
-              await FirebaseFirestore.instance
-                  .collection('volunteer_notifications')
-                  .doc(doc.id)
-                  .update({
-                    'read': true,
-                    'readAt': FieldValue.serverTimestamp(),
-                  });
-            } catch (_) {}
-
-            await _openResubmissionFlow(matchRecordId, note);
-          }
-        });
-  }
-
-  Future<void> _openResubmissionFlow(
-    String matchRecordId,
-    String reason,
-  ) async {
-    try {
-      final matchDoc = await FirebaseFirestore.instance
-          .collection('match_records')
-          .doc(matchRecordId)
-          .get();
-      if (!matchDoc.exists || matchDoc.data() == null || !mounted) {
-        return;
-      }
-
-      final matchData = matchDoc.data()!;
-      final taskId = matchData['taskId'] as String? ?? '';
-      if (taskId.isEmpty) return;
-
-      final taskDoc = await FirebaseFirestore.instance
-          .collection('tasks')
-          .doc(taskId)
-          .get();
-      if (!taskDoc.exists || taskDoc.data() == null || !mounted) {
-        return;
-      }
-
-      final taskMap = Map<String, dynamic>.from(taskDoc.data()!);
-      final taskModel = TaskModel.fromJson(taskMap);
-
-      String ngoName = 'NGO Coordinator';
-      String ngoPhone = '';
-      String ngoEmail = '';
-
-      try {
-        final pcDoc = await FirebaseFirestore.instance
-            .collection('problem_cards')
-            .doc(taskModel.problemCardId)
-            .get();
-        if (pcDoc.exists && pcDoc.data() != null) {
-          final ngoId = pcDoc.data()!['ngoId'];
-          if (ngoId != null) {
-            final ngoDoc = await FirebaseFirestore.instance
-                .collection('users')
-                .doc(ngoId)
-                .get();
-            if (ngoDoc.exists && ngoDoc.data() != null) {
-              ngoName = ngoDoc['name'] ?? ngoName;
-              ngoPhone = ngoDoc['phone'] ?? ngoPhone;
-              ngoEmail = ngoDoc['email'] ?? ngoEmail;
-            }
-          }
-        }
-      } catch (_) {}
-
-      if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ActiveTaskScreen(
-            matchRecordId: matchRecordId,
-            task: taskModel,
-            ngoName: ngoName,
-            ngoPhone: ngoPhone,
-            ngoEmail: ngoEmail,
-            autoOpenProofSheet: true,
-            rejectionReason: reason,
-          ),
-        ),
-      );
-    } catch (_) {}
   }
 
   Future<void> _updateAvailability(bool isActive, bool isPartial) async {
@@ -165,31 +45,22 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           .collection('volunteer_profiles')
           .doc(widget.uid)
           .update({
-            'availabilityWindowActive': isActive,
-            'isPartialAvailability': isPartial,
-            'availabilityUpdatedAt': FieldValue.serverTimestamp(),
-          });
+        'availabilityWindowActive': isActive,
+        'isPartialAvailability': isPartial,
+        'availabilityUpdatedAt': FieldValue.serverTimestamp(),
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Availability updated successfully!',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Availability updated!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to update: $e',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Failed: $e'), backgroundColor: SahayaColors.coral),
         );
       }
     }
@@ -197,23 +68,18 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Sahaya Volunteer',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Colors.blueAccent,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
+        title: Text('Sahaya', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person, color: Colors.blueAccent),
-            onPressed: () {},
+            icon: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+            onPressed: () => themeProvider.toggle(),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
@@ -223,202 +89,186 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: cs.primary));
           }
-
-          if (snapshot.hasError ||
-              !snapshot.hasData ||
-              !snapshot.data!.exists) {
+          if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
             return const Center(child: Text('Profile not found.'));
           }
 
           final profileMap = snapshot.data!.data() as Map<String, dynamic>;
           final profile = VolunteerProfile.fromJson(profileMap);
-
           final bool windowActive = profile.availabilityWindowActive;
           final DateTime updatedAt = profile.availabilityUpdatedAt;
           final bool isStale = DateTime.now().difference(updatedAt).inDays >= 7;
 
           if (!windowActive || isStale) {
             return _buildCheckInPrompt(context);
-          } else {
-            return _buildDashboard(profile);
           }
+          return _buildDashboard(context, profile);
         },
       ),
     );
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  CHECK-IN PROMPT
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Widget _buildCheckInPrompt(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFF7F9FC),
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.event_available, size: 80, color: Colors.blueAccent),
-          const SizedBox(height: 24),
-          const Text(
-            'Available this weekend?',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Icon(Icons.event_available_rounded, size: 44, color: cs.primary),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Let us know if you can help with community tasks recently matched to your location and skillset.',
-            style: TextStyle(fontSize: 16, color: Colors.black54),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 48),
-          ScaleTransition(
-            scale: _pulseAnimation,
-            child: SizedBox(
+            const SizedBox(height: 32),
+            Text(
+              'Available this\nweekend?',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+                letterSpacing: -1,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Help your community — we\'ll match you with\nnearby tasks based on your skills.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 44),
+
+            // Yes
+            ScaleTransition(
+              scale: _pulseAnimation,
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => _updateAvailability(true, false),
+                  child: const Text('Yes, I\'m available'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Partially
+            SizedBox(
               width: double.infinity,
-              height: 60,
-              child: ElevatedButton(
-                onPressed: () => _updateAvailability(true, false),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 8,
-                  shadowColor: Colors.blueAccent.withValues(alpha: 0.5),
-                ),
-                child: const Text(
-                  'Yes, I am available!',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+              height: 56,
+              child: OutlinedButton(
+                onPressed: () => _updateAvailability(true, true),
+                child: const Text('Partially — a few hours'),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 60,
-            child: OutlinedButton(
-              onPressed: () => _updateAvailability(true, true),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.blueAccent, width: 2),
-                foregroundColor: Colors.blueAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 12),
+
+            // No
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: TextButton(
+                onPressed: () => _updateAvailability(false, false),
+                style: TextButton.styleFrom(
+                  foregroundColor: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted,
                 ),
-              ),
-              child: const Text(
-                'Partially (A few hours)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                child: const Text('Not this time'),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 60,
-            child: TextButton(
-              onPressed: () => _updateAvailability(false, false),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey[600],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: const Text(
-                'Not this time',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDashboard(VolunteerProfile profile) {
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  //  MAIN DASHBOARD
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Widget _buildDashboard(BuildContext context, VolunteerProfile profile) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return DefaultTabController(
       length: 3,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Status Card
+          // ─── Status Hero ───
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.blueAccent, Colors.lightBlue],
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                      : [const Color(0xFF111827), const Color(0xFF1F2937)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Status',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'You\'re checked in',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(12),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Matching you with nearby tasks',
+                          style: GoogleFonts.inter(color: Colors.white60, fontSize: 14),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              profile.isPartialAvailability
-                                  ? 'Partially Active'
-                                  : 'Fully Active',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'You are checked in!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'We are matching you with nearby tasks based on your skills.',
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.circle, size: 8, color: cs.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          profile.isPartialAvailability ? 'Partial' : 'Active',
+                          style: GoogleFonts.inter(
+                            color: cs.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -426,35 +276,41 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           ),
           const SizedBox(height: 16),
 
-          // Tab bar to clearly separate the two views
+          // ─── Tab Bar ───
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
+              color: isDark ? SahayaColors.darkSurface : const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: TabBar(
               indicator: BoxDecoration(
-                color: Colors.blueAccent,
-                borderRadius: BorderRadius.circular(12),
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.black54,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+              labelColor: cs.onSurface,
+              unselectedLabelColor: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted,
+              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
               dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
               tabs: const [
-                Tab(text: 'My Missions'),
-                Tab(text: 'Available'),
-                Tab(text: 'History'),
+                Tab(child: _MarqueeText(text: 'Available')),
+                Tab(child: _MarqueeText(text: 'My Missions')),
+                Tab(child: _MarqueeText(text: 'History')),
               ],
             ),
           ),
           const SizedBox(height: 8),
 
-          // Tab body
+          // ─── Tab Body ───
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -463,105 +319,44 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                   .snapshots(),
               builder: (context, matchSnapshot) {
                 if (matchSnapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error: ${matchSnapshot.error}',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  );
+                  return Center(child: Text('Error: ${matchSnapshot.error}'));
                 }
                 if (matchSnapshot.connectionState == ConnectionState.waiting) {
-                  return const ListShimmer(itemCount: 6);
+                  return Center(child: CircularProgressIndicator(color: cs.primary));
                 }
-                if (!matchSnapshot.hasData ||
-                    matchSnapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.radar, size: 60, color: Colors.blue[100]),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Scanning for community needs...',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
+                if (!matchSnapshot.hasData || matchSnapshot.data!.docs.isEmpty) {
+                  return _emptyState(
+                    icon: Icons.radar_rounded,
+                    title: 'Scanning for tasks',
+                    subtitle: 'We\'ll notify you when there\'s a match nearby.',
                   );
                 }
 
                 final allDocs = matchSnapshot.data!.docs.toList();
 
-                // Split into accepted/proof_submitted vs open
                 final acceptedDocs = allDocs.where((d) {
-                  final s =
-                      (d.data() as Map<String, dynamic>)['status'] as String? ??
-                      '';
-                  return s == 'accepted' ||
-                      s == 'proof_submitted' ||
-                      s == 'proof_rejected';
-                }).toList();
+                  final s = (d.data() as Map<String, dynamic>)['status'] as String? ?? '';
+                  return s == 'accepted' || s == 'proof_submitted';
+                }).toList()
+                  ..sort(_byScoreDesc);
 
                 final openDocs = allDocs.where((d) {
-                  final s =
-                      (d.data() as Map<String, dynamic>)['status'] as String? ??
-                      '';
+                  final s = (d.data() as Map<String, dynamic>)['status'] as String? ?? '';
                   return s == 'open';
-                }).toList();
+                }).toList()
+                  ..sort(_byScoreDesc);
 
-                final approvedDocs = allDocs.where((d) {
-                  final s =
-                      (d.data() as Map<String, dynamic>)['status'] as String? ??
-                      '';
+                final historyDocs = allDocs.where((d) {
+                  final s = (d.data() as Map<String, dynamic>)['status'] as String? ?? '';
                   return s == 'proof_approved';
-                }).toList();
-
-                // Sort both by matchScore descending
-                acceptedDocs.sort((a, b) {
-                  final aScore =
-                      ((a.data() as Map<String, dynamic>)['matchScore'] as num?)
-                          ?.toDouble() ??
-                      0.0;
-                  final bScore =
-                      ((b.data() as Map<String, dynamic>)['matchScore'] as num?)
-                          ?.toDouble() ??
-                      0.0;
-                  return bScore.compareTo(aScore);
-                });
-                openDocs.sort((a, b) {
-                  final aScore =
-                      ((a.data() as Map<String, dynamic>)['matchScore'] as num?)
-                          ?.toDouble() ??
-                      0.0;
-                  final bScore =
-                      ((b.data() as Map<String, dynamic>)['matchScore'] as num?)
-                          ?.toDouble() ??
-                      0.0;
-                  return bScore.compareTo(aScore);
-                });
-
-                approvedDocs.sort((a, b) {
-                  final aData = a.data() as Map<String, dynamic>;
-                  final bData = b.data() as Map<String, dynamic>;
-                  final aTime =
-                      (aData['completedAt'] as Timestamp?)?.toDate() ??
-                      (aData['createdAt'] as Timestamp?)?.toDate() ??
-                      DateTime.fromMillisecondsSinceEpoch(0);
-                  final bTime =
-                      (bData['completedAt'] as Timestamp?)?.toDate() ??
-                      (bData['createdAt'] as Timestamp?)?.toDate() ??
-                      DateTime.fromMillisecondsSinceEpoch(0);
-                  return bTime.compareTo(aTime);
-                });
+                }).toList()
+                  ..sort(_byScoreDesc);
 
                 return TabBarView(
                   children: [
-                    // Tab 1: My Missions (accepted)
-                    _buildMissionsList(acceptedDocs, isAccepted: true),
-                    // Tab 2: Available (open)
-                    _buildMissionsList(openDocs, isAccepted: false),
-                    // Tab 3: History (approved)
-                    _buildHistoryList(approvedDocs),
+                    _missionList(openDocs, isAccepted: false),
+                    _missionList(acceptedDocs, isAccepted: true),
+                    _missionList(historyDocs, isAccepted: true, isHistory: true),
                   ],
                 );
               },
@@ -572,402 +367,139 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     );
   }
 
-  Widget _buildHistoryList(List<QueryDocumentSnapshot> docs) {
-    if (docs.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history, size: 60, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            const Text(
-              'No completed missions yet.',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      );
-    }
+  int _byScoreDesc(QueryDocumentSnapshot a, QueryDocumentSnapshot b) {
+    final aS = ((a.data() as Map<String, dynamic>)['matchScore'] as num?)?.toDouble() ?? 0;
+    final bS = ((b.data() as Map<String, dynamic>)['matchScore'] as num?)?.toDouble() ?? 0;
+    return bS.compareTo(aS);
+  }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: docs.length,
-      itemBuilder: (context, index) {
-        final doc = docs[index];
-        final match = Map<String, dynamic>.from(
-          doc.data() as Map<String, dynamic>,
-        );
-        final taskId = match['taskId'] as String? ?? '';
-        final impactStatement =
-            (match['impactStatement'] as String?)?.trim() ?? '';
-        final doneAt =
-            (match['completedAt'] as Timestamp?)?.toDate() ??
-            (match['createdAt'] as Timestamp?)?.toDate();
-
-        return FutureBuilder<DocumentSnapshot>(
-          future: FirebaseFirestore.instance
-              .collection('tasks')
-              .doc(taskId)
-              .get(),
-          builder: (context, taskSnapshot) {
-            if (taskSnapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(height: 110, child: ListShimmer(itemCount: 1));
-            }
-            if (!taskSnapshot.hasData || !taskSnapshot.data!.exists) {
-              return const SizedBox.shrink();
-            }
-
-            final taskData = taskSnapshot.data!.data() as Map<String, dynamic>;
-            final description =
-                taskData['description'] as String? ?? 'Volunteer Task';
-            final ward = taskData['locationWard'] as String? ?? 'Unknown Ward';
-
-            return Card(
-              elevation: 1.5,
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.verified,
-                            color: Colors.green,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            description,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 13,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          ward,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          doneAt == null
-                              ? 'Completed'
-                              : '${doneAt.year}-${doneAt.month.toString().padLeft(2, '0')}-${doneAt.day.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.blueGrey.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        impactStatement.isEmpty
-                            ? 'You helped improve this community task outcome.'
-                            : impactStatement,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.35,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Widget _emptyState({required IconData icon, required String title, required String subtitle}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 56, color: isDark ? SahayaColors.darkBorder : const Color(0xFFD1D5DB)),
+          const SizedBox(height: 16),
+          Text(title, style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),
+          const SizedBox(height: 6),
+          Text(subtitle, style: GoogleFonts.inter(fontSize: 14, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted), textAlign: TextAlign.center),
+        ],
+      ),
     );
   }
 
-  Widget _buildMissionsList(
-    List<QueryDocumentSnapshot> docs, {
-    required bool isAccepted,
-  }) {
+  Widget _missionList(List<QueryDocumentSnapshot> docs, {required bool isAccepted, bool isHistory = false}) {
     if (docs.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isAccepted ? Icons.assignment_turned_in : Icons.search,
-              size: 60,
-              color: Colors.grey[300],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isAccepted
-                  ? 'No accepted missions yet.\nBrowse Available tasks to get started!'
-                  : 'No recommended tasks right now.\nCheck back soon!',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
+      return _emptyState(
+        icon: isHistory ? Icons.history_rounded : (isAccepted ? Icons.assignment_turned_in_outlined : Icons.search_rounded),
+        title: isHistory ? 'No past missions' : (isAccepted ? 'No active missions' : 'No tasks right now'),
+        subtitle: isHistory ? 'Your impact journey starts here.' : (isAccepted ? 'Accept a task from Available to begin.' : 'Check back soon — new tasks appear daily.'),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       itemCount: docs.length,
-      itemBuilder: (context, index) {
-        final doc = docs[index];
-        final matchMap = Map<String, dynamic>.from(
-          doc.data() as Map<String, dynamic>,
-        );
+      itemBuilder: (context, i) {
+        final doc = docs[i];
+        final matchMap = Map<String, dynamic>.from(doc.data() as Map<String, dynamic>);
         matchMap['id'] = doc.id;
-
-        return _MatchRecordCard(matchMap: matchMap, isAccepted: isAccepted);
+        return _TaskCard(matchMap: matchMap, isAccepted: isAccepted, isHistory: isHistory);
       },
     );
   }
 }
 
-/// Individual card widget for a single MatchRecord.
-/// Fetches the linked Task from Firestore to display details.
-class _MatchRecordCard extends StatelessWidget {
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  TASK CARD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+class _TaskCard extends StatelessWidget {
   final Map<String, dynamic> matchMap;
   final bool isAccepted;
-
-  const _MatchRecordCard({required this.matchMap, required this.isAccepted});
+  final bool isHistory;
+  const _TaskCard({required this.matchMap, required this.isAccepted, this.isHistory = false});
 
   @override
   Widget build(BuildContext context) {
-    final String taskId = matchMap['taskId'] ?? '';
-    final double matchScore =
-        (matchMap['matchScore'] as num?)?.toDouble() ?? 0.0;
-    final int scorePercent = (matchScore * 100).round();
-    final String status = matchMap['status'] ?? 'open';
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final taskId = matchMap['taskId'] ?? '';
+    final matchScore = (matchMap['matchScore'] as num?)?.toDouble() ?? 0;
+    final pct = (matchScore * 100).round();
+    final status = matchMap['status'] ?? 'open';
 
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('tasks').doc(taskId).get(),
-      builder: (context, taskSnapshot) {
-        if (taskSnapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 120, child: ListShimmer(itemCount: 1));
-        }
-        if (!taskSnapshot.hasData || !taskSnapshot.data!.exists) {
-          return const SizedBox.shrink();
-        }
+      builder: (context, snap) {
+        if (!snap.hasData || !snap.data!.exists) return const SizedBox.shrink();
 
-        final taskData = taskSnapshot.data!.data() as Map<String, dynamic>;
-        final String description = taskData['description'] ?? 'Volunteer Task';
-        final String ward = taskData['locationWard'] ?? 'Unknown Ward';
-        final String taskType = (taskData['taskType'] ?? 'other')
-            .toString()
-            .replaceAll('_', ' ');
+        final td = snap.data!.data() as Map<String, dynamic>;
+        final desc = td['description'] ?? 'Task';
+        final ward = td['locationWard'] ?? '';
+        final type = (td['taskType'] ?? 'other').toString().replaceAll('_', ' ');
 
-        Color statusColor;
-        String statusLabel;
-        IconData statusIcon;
-
-        if (status == 'proof_submitted') {
-          statusColor = Colors.orange;
-          statusLabel = 'Proof Submitted';
-          statusIcon = Icons.hourglass_top;
-        } else if (status == 'proof_rejected') {
-          statusColor = Colors.deepOrange;
-          statusLabel = 'Revision Needed';
-          statusIcon = Icons.restart_alt;
-        } else if (isAccepted) {
-          statusColor = Colors.green;
-          statusLabel = 'Accepted';
-          statusIcon = Icons.check_circle;
-        } else {
-          statusColor = Colors.blueAccent;
-          statusLabel = '$scorePercent% Match';
-          statusIcon = Icons.auto_awesome;
-        }
-
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: isAccepted
-                ? BorderSide(color: Colors.green.shade200, width: 1.5)
-                : BorderSide.none,
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              if (status == 'proof_rejected') {
-                _navigateToActiveTask(
-                  context,
-                  taskData,
-                  autoOpenProofSheet: true,
-                  rejectionReason: matchMap['adminReviewNote'] as String? ?? '',
-                );
-              } else if (isAccepted && status != 'proof_submitted') {
-                // Go directly to ActiveTaskScreen for accepted missions
-                _navigateToActiveTask(context, taskData);
-              } else if (status == 'proof_submitted') {
-                // Already submitted — show a message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Proof already submitted. Waiting for NGO review.',
-                    ),
-                    backgroundColor: Colors.orange,
+        return GestureDetector(
+          onTap: () => _onTap(context, td, pct, status),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: isHistory
+                  ? Border.all(color: SahayaColors.emerald.withValues(alpha: 0.2), width: 1)
+                  : (isAccepted
+                      ? Border.all(color: cs.primary.withValues(alpha: 0.3), width: 1.5)
+                      : Border.all(color: isDark ? SahayaColors.darkBorder : SahayaColors.lightBorder)),
+              boxShadow: [sahayaCardShadow(context)],
+            ),
+            child: Row(
+              children: [
+                // Left icon
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: isAccepted
+                        ? cs.primary.withValues(alpha: 0.1)
+                        : (isDark ? SahayaColors.darkBorder.withValues(alpha: 0.3) : const Color(0xFFF3F4F6)),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                );
-              } else {
-                // Open = go to Mission Briefing (view-only until they accept)
-                _navigateToDetails(context, taskData, scorePercent);
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  child: Icon(
+                    isHistory ? Icons.verified_rounded : (isAccepted ? Icons.run_circle_rounded : Icons.assignment_outlined),
+                    color: isHistory ? SahayaColors.emerald : (isAccepted ? cs.primary : cs.onSurface.withValues(alpha: 0.5)),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // Content
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          isAccepted ? Icons.run_circle : Icons.assignment,
-                          color: statusColor,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              description,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                      Text(desc, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (ward.isNotEmpty) ...[
+                            Icon(Icons.location_on_outlined, size: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(ward, style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted), overflow: TextOverflow.ellipsis),
                             ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  size: 14,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    ward,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 13,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            const SizedBox(width: 10),
                           ],
-                        ),
+                          _pill(context, type, isDark ? SahayaColors.darkBorder : const Color(0xFFE5E7EB), cs.onSurface.withValues(alpha: 0.6)),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Status pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(statusIcon, size: 14, color: statusColor),
-                            const SizedBox(width: 4),
-                            Text(
-                              statusLabel,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Task type chip
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          taskType,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      // Action button
-                      Icon(Icons.chevron_right, color: Colors.grey.shade400),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                // Right badge
+                _statusBadge(context, status, pct),
+              ],
             ),
           ),
         );
@@ -975,74 +507,130 @@ class _MatchRecordCard extends StatelessWidget {
     );
   }
 
-  void _navigateToActiveTask(
-    BuildContext context,
-    Map<String, dynamic> taskData, {
-    bool autoOpenProofSheet = false,
-    String? rejectionReason,
-  }) async {
-    final taskModel = TaskModel.fromJson(taskData);
-
-    // Fetch NGO info
-    String ngoName = 'NGO Coordinator';
-    String ngoPhone = '';
-    String ngoEmail = '';
-
-    try {
-      final pcDoc = await FirebaseFirestore.instance
-          .collection('problem_cards')
-          .doc(taskModel.problemCardId)
-          .get();
-      if (pcDoc.exists && pcDoc.data() != null) {
-        final ngoId = pcDoc.data()!['ngoId'];
-        if (ngoId != null) {
-          final ngoDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(ngoId)
-              .get();
-          if (ngoDoc.exists && ngoDoc.data() != null) {
-            ngoName = ngoDoc['name'] ?? ngoName;
-            ngoPhone = ngoDoc['phone'] ?? ngoPhone;
-            ngoEmail = ngoDoc['email'] ?? ngoEmail;
-          }
-        }
-      }
-    } catch (_) {}
-
-    if (!context.mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ActiveTaskScreen(
-          matchRecordId: matchMap['id'] ?? '',
-          task: taskModel,
-          ngoName: ngoName,
-          ngoPhone: ngoPhone,
-          ngoEmail: ngoEmail,
-          autoOpenProofSheet: autoOpenProofSheet,
-          rejectionReason: rejectionReason,
-        ),
-      ),
+  Widget _pill(BuildContext context, String text, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(text, style: GoogleFonts.inter(fontSize: 11, color: fg, fontWeight: FontWeight.w500)),
     );
   }
 
-  void _navigateToDetails(
-    BuildContext context,
-    Map<String, dynamic> taskData,
-    int scorePercent,
-  ) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TaskDetailsScreen(
-          taskId: matchMap['taskId'] ?? '',
-          matchRecordId: matchMap['id'] ?? '',
-          initialTask: TaskModel.fromJson(taskData),
-          matchScore: scorePercent,
-          isAlreadyAccepted: false,
-          whatToBring:
-              matchMap['whatToBring'] ??
-              'Standard volunteering gear and water.',
+  Widget _statusBadge(BuildContext context, String status, int pct) {
+    if (isHistory) {
+      return _pill(context, 'Completed', SahayaColors.emeraldMuted, SahayaColors.emerald);
+    }
+    final cs = Theme.of(context).colorScheme;
+    if (status == 'proof_submitted') {
+      return _pill(context, 'Proof sent', SahayaColors.amberMuted, SahayaColors.amber);
+    } else if (status == 'accepted') {
+      return _pill(context, 'Active', SahayaColors.emeraldMuted, SahayaColors.emerald);
+    }
+    return _pill(context, '$pct%', cs.primary.withValues(alpha: 0.1), cs.primary);
+  }
+
+  void _onTap(BuildContext context, Map<String, dynamic> taskData, int pct, String status) {
+    if (isAccepted || status == 'proof_submitted' || isHistory) {
+      _goActive(context, taskData);
+    } else {
+      _goDetails(context, taskData, pct);
+    }
+  }
+
+  void _goActive(BuildContext context, Map<String, dynamic> td) async {
+    final task = TaskModel.fromJson(td);
+    String ngoName = 'Coordinator', ngoPhone = '', ngoEmail = '';
+    try {
+      final pc = await FirebaseFirestore.instance.collection('problem_cards').doc(task.problemCardId).get();
+      if (pc.exists) {
+        final ngoId = pc.data()?['ngoId'];
+        if (ngoId != null) {
+          final ngo = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
+          if (ngo.exists) { ngoName = ngo['name'] ?? ngoName; ngoPhone = ngo['phone'] ?? ''; ngoEmail = ngo['email'] ?? ''; }
+        }
+      }
+    } catch (_) {}
+    if (!context.mounted) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => ActiveTaskScreen(
+        matchRecordId: matchMap['id'] ?? '', 
+        task: task, 
+        ngoName: ngoName, 
+        ngoPhone: ngoPhone, 
+        ngoEmail: ngoEmail,
+        status: matchMap['status'] ?? 'accepted',
+        proof: matchMap['proof'] as Map<String, dynamic>?,
+      ),
+    ));
+  }
+
+  void _goDetails(BuildContext context, Map<String, dynamic> td, int pct) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => TaskDetailsScreen(
+        taskId: matchMap['taskId'] ?? '', matchRecordId: matchMap['id'] ?? '',
+        initialTask: TaskModel.fromJson(td), matchScore: pct, isAlreadyAccepted: false,
+        whatToBring: matchMap['whatToBring'] ?? 'Standard gear and water.',
+      ),
+    ));
+  }
+}
+
+class _MarqueeText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  const _MarqueeText({required this.text, this.style});
+
+  @override
+  State<_MarqueeText> createState() => _MarqueeTextState();
+}
+
+class _MarqueeTextState extends State<_MarqueeText> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _startScrolling() async {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    if (maxScroll <= 0) return;
+
+    while (mounted) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) break;
+      await _scrollController.animateTo(
+        maxScroll,
+        duration: Duration(milliseconds: (maxScroll * 40).toInt()),
+        curve: Curves.linear,
+      );
+      if (!mounted) break;
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) break;
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Text(
+          widget.text,
+          style: widget.style ?? GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+          maxLines: 1,
         ),
       ),
     );

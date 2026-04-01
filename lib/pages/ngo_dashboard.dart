@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'upload_screen.dart';
 import 'review_queue_screen.dart';
 import 'ngo_home_screen.dart';
+import 'ngo_impact_dashboard_screen.dart';
 
 class NgoDashboard extends StatefulWidget {
   final String ngoId;
@@ -23,6 +24,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
       NgoHomeScreen(ngoId: widget.ngoId),
       UploadScreen(ngoId: widget.ngoId),
       ReviewQueueScreen(ngoId: widget.ngoId),
+      NgoImpactDashboardScreen(ngoId: widget.ngoId),
     ];
   }
 
@@ -34,36 +36,43 @@ class _NgoDashboardState extends State<NgoDashboard> {
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: widget.ngoId)
-          .where('status', whereIn: ['pending_review', 'extraction_failed'])
+            .where('status', whereIn: ['pending_review', 'extraction_failed'])
             .snapshots(),
         builder: (context, snapshot) {
           final pendingCount = snapshot.data?.docs.length ?? 0;
 
-          return BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
-            selectedItemColor: Colors.blueAccent,
-            unselectedItemColor: Colors.black45,
-            type: BottomNavigationBarType.fixed,
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.dashboard),
+          return NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (i) => setState(() => _currentIndex = i),
+            height: 72,
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard_rounded),
                 label: 'Dashboard',
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.cloud_upload),
-                label: 'Ingestion',
+              const NavigationDestination(
+                icon: Icon(Icons.add_circle_outline_rounded),
+                selectedIcon: Icon(Icons.add_circle_rounded),
+                label: 'Upload',
               ),
-              BottomNavigationBarItem(
+              NavigationDestination(
                 icon: Badge(
                   isLabelVisible: pendingCount > 0,
-                  label: Text(
-                    '$pendingCount',
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  child: const Icon(Icons.fact_check),
+                  label: Text('$pendingCount', style: const TextStyle(fontSize: 10)),
+                  child: const Icon(Icons.rate_review_outlined),
+                ),
+                selectedIcon: Badge(
+                  isLabelVisible: pendingCount > 0,
+                  label: Text('$pendingCount', style: const TextStyle(fontSize: 10)),
+                  child: const Icon(Icons.rate_review_rounded),
                 ),
                 label: 'Review',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.insights_outlined),
+                selectedIcon: Icon(Icons.insights_rounded),
+                label: 'Impact',
               ),
             ],
           );

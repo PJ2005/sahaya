@@ -60,7 +60,9 @@ dependencies:
   fl_chart: ^1.0.0
   shimmer: ^3.0.0
   connectivity_plus: ^6.1.5
-  http: ^1.6.0
+  google_fonts: ^6.2.1
+  integration_test:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
@@ -75,8 +77,6 @@ dev_dependencies:
   build_runner: ^2.13.1
   freezed: ^3.2.5
   json_serializable: ^6.13.1
-  integration_test:
-    sdk: flutter
   fake_cloud_firestore: ^4.1.0+1
 
 # For information on the generic Dart part of this file, see the

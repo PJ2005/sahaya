@@ -14,7 +14,7 @@ class ListShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: itemCount,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(

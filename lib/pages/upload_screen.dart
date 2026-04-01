@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/raw_upload.dart';
 import '../models/problem_card.dart';
 import '../services/gemini_service.dart';
 import 'package:uuid/uuid.dart';
 import '../components/list_shimmer.dart';
+import '../theme/sahaya_theme.dart';
 
 class UploadScreen extends StatefulWidget {
   final String ngoId;
@@ -20,20 +21,15 @@ class UploadScreen extends StatefulWidget {
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
-class _UploadScreenState extends State<UploadScreen>
-    with SingleTickerProviderStateMixin {
+class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
   bool _isUploading = false;
-  late String _botUsername;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Dynamic Fallback Mapping
-    _botUsername = dotenv.env['TELEGRAM_BOT_USERNAME'] ?? 'Sahaya_Helper_bot';
   }
 
   Future<void> _pickAndUploadFile() async {
@@ -46,7 +42,6 @@ class _UploadScreenState extends State<UploadScreen>
       if (result != null && result.files.single.path != null) {
         setState(() => _isUploading = true);
 
-        // 1. Instantiating Unsigned Native Mapping explicitly securely
         final cloudinary = CloudinaryPublic(
           dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'demo',
           dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'preset',
@@ -63,12 +58,10 @@ class _UploadScreenState extends State<UploadScreen>
           ),
         );
 
-        // 2. Structuring native Database generic payload safely
         String fileType = 'document';
         if (['png', 'jpg', 'jpeg'].contains(ext)) fileType = 'image';
         if (ext == 'csv') fileType = 'csv';
 
-        // 3. Document Inject securely mapped
         final String docId = const Uuid().v4();
         final rawUpload = RawUpload(
           id: docId,
@@ -84,22 +77,14 @@ class _UploadScreenState extends State<UploadScreen>
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Direct Upload securely validated sequentially!'),
-              backgroundColor: Colors.green,
-            ),
+            const SnackBar(content: Text('File uploaded successfully!'), backgroundColor: SahayaColors.emerald),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Native Pipeline Pipeline completely rejected natively: $e',
-            ),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: SahayaColors.coral),
         );
       }
     } finally {
@@ -107,370 +92,288 @@ class _UploadScreenState extends State<UploadScreen>
     }
   }
 
-  Future<void> _launchTelegram() async {
-    final url = Uri.parse('https://t.me/$_botUsername?start=${widget.ngoId}');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Telegram Client Native Hook strictly missing!'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
-  }
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  Widget _buildDirectUploadTab() {
-    return SingleChildScrollView(
-      child: Container(
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(24.0),
-        child: InkWell(
-          onTap: _isUploading ? null : _pickAndUploadFile,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            width: double.infinity,
-            height: 220,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Smart Ingestion', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Header / Tabs
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: Colors.blueAccent.withOpacity(0.3),
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.blueAccent.withOpacity(0.08),
-                  blurRadius: 25,
-                  spreadRadius: 2,
-                ),
-              ],
+              color: isDark ? SahayaColors.darkSurface : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _isUploading
-                    ? const CircularProgressIndicator(color: Colors.blueAccent)
-                    : const Icon(
-                        Icons.cloud_upload_outlined,
-                        size: 72,
-                        color: Colors.blueAccent,
-                      ),
-                const SizedBox(height: 16),
-                Text(
-                  _isUploading
-                      ? 'Transmitting Physical Payload natively...'
-                      : 'Tap to Inject Physical File\n(PDF, CSV, Images, DOCX)',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2)),
+                ],
+              ),
+              labelColor: cs.primary,
+              unselectedLabelColor: cs.onSurfaceVariant,
+              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+              dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
+              tabs: const [
+                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.upload_file, size: 16), SizedBox(width: 8), Text('Direct Upload')])),
+                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.telegram, size: 16), SizedBox(width: 8), Text('Telegram Sync')])),
               ],
             ),
           ),
-        ),
+
+          // Main Interactive Area (60-70% height)
+          Expanded(
+            flex: 6,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                SingleChildScrollView(child: _buildDirectUpload(context)),
+                SingleChildScrollView(child: _buildTelegramSync(context)),
+              ],
+            ),
+          ),
+
+          // Sync Feed Section (30-40% height)
+          const Divider(height: 1),
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Container(
+                  width: 8, height: 8,
+                  decoration: const BoxDecoration(color: SahayaColors.emerald, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 10),
+                Text('LIVE SYNC FEED', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: cs.primary, letterSpacing: 1)),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: _buildRecentUploads(),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTelegramTab() {
-    final deepLinkString = 'https://t.me/$_botUsername?start=${widget.ngoId}';
+  Widget _buildDirectUpload(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return SingleChildScrollView(
-      child: Container(
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(24.0),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.green.withOpacity(0.08),
-                blurRadius: 25,
-                spreadRadius: 2,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GestureDetector(
+            onTap: _isUploading ? null : _pickAndUploadFile,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              decoration: BoxDecoration(
+                color: isDark ? SahayaColors.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: cs.primary.withValues(alpha: 0.2), width: 2),
+                boxShadow: [sahayaCardShadow(context)],
               ),
-            ],
+              child: Column(
+                children: [
+                  if (_isUploading)
+                    CircularProgressIndicator(color: cs.primary)
+                  else
+                    Icon(Icons.cloud_upload_rounded, size: 64, color: cs.primary),
+                  const SizedBox(height: 20),
+                  Text(_isUploading ? 'Uploading to cloud...' : 'Press to select files', 
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Text('PDF, DOCX, CSV or Images', 
+                    style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+                ],
+              ),
+            ),
           ),
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Scan dynamically to natively bind your Telegram Device Pipeline!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 24),
-              QrImageView(
-                data: deepLinkString,
-                version: QrVersions.auto,
-                size: 180.0,
-                backgroundColor: Colors.white,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _launchTelegram,
-                icon: const Icon(Icons.send),
-                label: const Text('Launch Physical Bot Mapping'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  backgroundColor: const Color(
-                    0xFF0088cc,
-                  ), // Official Telegram Blue
-                  foregroundColor: Colors.white,
-                  elevation: 5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Or completely launch it manually by messaging the Bot:',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-              const SizedBox(height: 8),
-              SelectableText(
-                '/register ${widget.ngoId}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueAccent,
-                  backgroundColor: Color(0xFFE3F2FD),
-                ),
-              ),
-            ],
+          const SizedBox(height: 24),
+          Text(
+            'Files uploaded here are automatically processed by Sahaya AI to extract problem reports, severity levels, and locations.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant, height: 1.5),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTelegramSync(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final String registerCmd = '/register ${widget.ngoId}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? SahayaColors.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF0088cc).withValues(alpha: 0.3)),
+              boxShadow: [sahayaCardShadow(context)],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.telegram, color: Color(0xFF0088cc), size: 28),
+                    const SizedBox(width: 12),
+                    Text('Telegram Assistant', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text('YOUR REGISTRATION COMMAND', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0088cc).withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF0088cc).withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(registerCmd, style: GoogleFonts.firaCode(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF0088cc))),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: registerCmd));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Command copied to clipboard!')));
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 20, color: Color(0xFF0088cc)),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text('CONNECTION STEPS', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
+                const SizedBox(height: 12),
+                _stepRow(context, '1', 'Install Telegram on your mobile device.'),
+                _stepRow(context, '2', 'Find @Sahaya_Helper_bot in search.'),
+                _stepRow(context, '3', 'Send the registration command copied above.'),
+                _stepRow(context, '4', 'Start forwarding reports, photos, or documents!'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepRow(BuildContext context, String num, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$num.', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, color: const Color(0xFF0088cc))),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurface, height: 1.3))),
+        ],
       ),
     );
   }
 
   Widget _buildRecentUploads() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _db
-          .collection('raw_uploads')
-          .where('ngoId', isEqualTo: widget.ngoId)
-          .orderBy('uploadedAt', descending: true)
-          .limit(5)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              "Sync Error natively intercepted: ${snapshot.error}",
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const ListShimmer(itemCount: 5);
-        }
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    return StreamBuilder<QuerySnapshot>(
+      stream: _db.collection('raw_uploads').where('ngoId', isEqualTo: widget.ngoId).orderBy('uploadedAt', descending: true).limit(10).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const ListShimmer(itemCount: 4);
         final docs = snapshot.data?.docs ?? [];
+
         if (docs.isEmpty) {
-          return const Center(
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox_outlined, size: 48, color: Colors.black26),
-                SizedBox(height: 8),
-                Text(
-                  "No native payloads discovered.",
-                  style: TextStyle(
-                    color: Colors.black45,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Icon(Icons.sync_disabled_rounded, size: 32, color: cs.outlineVariant),
+                const SizedBox(height: 8),
+                Text('No recent syncs', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
               ],
             ),
           );
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final raw = RawUpload.fromJson({...data, 'id': docs[index].id});
 
-            Color chipColor = Colors.orange;
-            if (raw.status == UploadStatus.done) chipColor = Colors.green;
-            if (raw.status == UploadStatus.extraction_failed) {
-              chipColor = Colors.red;
-            }
+            Color statusColor = SahayaColors.amber;
+            if (raw.status == UploadStatus.done) statusColor = SahayaColors.emerald;
+            if (raw.status == UploadStatus.extraction_failed) statusColor = SahayaColors.coral;
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? SahayaColors.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
               ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                leading: CircleAvatar(
-                  backgroundColor: Colors.blue.withOpacity(0.1),
-                  child: Icon(
-                    raw.fileType == 'image'
-                        ? Icons.image
-                        : raw.fileType == 'csv'
-                        ? Icons.table_chart
-                        : Icons.insert_drive_file,
-                    color: Colors.blue[700],
-                  ),
-                ),
-                title: Text(
-                  '${raw.fileType.toUpperCase()} Payload',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                subtitle: Text(
-                  raw.uploadedAt.toString().split('.')[0],
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: chipColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: chipColor.withOpacity(0.5)),
-                  ),
-                  child: Text(
-                    raw.status.name.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: chipColor,
-                      fontWeight: FontWeight.w800,
+              child: Row(
+                children: [
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                    child: Icon(
+                      raw.fileType == 'image' ? Icons.image_outlined : (raw.fileType == 'csv' ? Icons.table_chart_outlined : Icons.description_outlined),
+                      size: 18, color: cs.primary,
                     ),
                   ),
-                ),
-                onTap: () async {
-                  if (raw.status != UploadStatus.pending) return;
-
-                  // Instantiating Dynamic Gemini Extractor structurally!
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (c) => const AlertDialog(
-                      content: Row(
-                        children: [
-                          CircularProgressIndicator(color: Colors.purple),
-                          SizedBox(width: 24),
-                          Expanded(
-                            child: Text(
-                              "Structuring AI Problem Card...",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${raw.fileType.toUpperCase()} PAYLOAD', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                        const SizedBox(height: 2),
+                        Text(_fmtTime(raw.uploadedAt), style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
+                      ],
                     ),
-                  );
-
-                  try {
-                    // Structure the ProblemCard natively over REST
-                    final draftCards = await GeminiService.structureProblemCard(
-                      raw,
-                    );
-
-                    // Native Database Inject Sequential Loop
-                    for (var draftCard in draftCards) {
-                      await FirebaseFirestore.instance
-                          .collection('problem_cards')
-                          .doc(draftCard.id)
-                          .set(draftCard.toJson());
-                    }
-
-                    // Resolve Raw Upload explicitly
-                    await FirebaseFirestore.instance
-                        .collection('raw_uploads')
-                        .doc(raw.id)
-                        .update({'status': 'done'});
-
-                    if (!mounted) return;
-                    Navigator.pop(context); // Dismiss loading overlay
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Physical Structure Validated and Queued safely!',
-                        ),
-                        backgroundColor: Colors.purple,
-                      ),
-                    );
-                  } catch (e) {
-                    if (!mounted) return;
-                    Navigator.pop(context); // Close LLM generic loader visually
-
-                    final bool invalidJson = e is GeminiInvalidJsonException;
-
-                    // Mark upload and review card as manual recovery fallback.
-                    await FirebaseFirestore.instance
-                        .collection('raw_uploads')
-                        .doc(raw.id)
-                        .update({'status': 'extraction_failed'});
-
-                    await FirebaseFirestore.instance
-                        .collection('problem_cards')
-                        .doc(raw.id)
-                        .set({
-                          'id': raw.id,
-                          'ngoId': raw.ngoId,
-                          'issueType': IssueType.other.name,
-                          'locationWard': 'Manual Review Required',
-                          'locationCity': 'Manual Review Required',
-                          'locationGeoPoint': const GeoPoint(0, 0),
-                          'severityLevel': SeverityLevel.medium.name,
-                          'affectedCount': 0,
-                          'description': invalidJson
-                              ? 'AI extraction returned invalid JSON. Manual entry required.'
-                              : 'AI extraction failed. Manual entry required.',
-                          'confidenceScore': 0.0,
-                          'status': ProblemStatus.extraction_failed.name,
-                          'priorityScore': 0.0,
-                          'severityContrib': 0.0,
-                          'scaleContrib': 0.0,
-                          'recencyContrib': 0.0,
-                          'gapContrib': 0.0,
-                          'createdAt': FieldValue.serverTimestamp(),
-                          'anonymized': true,
-                        },
-                        SetOptions(merge: true),
-                      );
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Extraction failed. Open Review Queue for manual entry. ($e)',
-                        ),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  }
-                },
+                  ),
+                  _miniPill(context, raw.status.name.toUpperCase(), statusColor.withValues(alpha: 0.1), statusColor),
+                  if (raw.status == UploadStatus.pending) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _processUpload(raw),
+                      icon: Icon(Icons.auto_awesome, color: cs.primary, size: 18),
+                    ),
+                  ],
+                ],
               ),
             );
           },
@@ -479,81 +382,74 @@ class _UploadScreenState extends State<UploadScreen>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(
-        0xFFF7F9FC,
-      ), // Modern off-white structural background
-      appBar: AppBar(
-        title: const Text(
-          'Sahaya Ingestion Pipeline',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(color: Colors.grey.withOpacity(0.2), height: 1.0),
+  Future<void> _processUpload(RawUpload raw) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 24),
+            Text("AI Extraction in progress...", style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+          ],
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Colors.blueAccent,
-              unselectedLabelColor: Colors.black45,
-              indicatorColor: Colors.blueAccent,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-              tabs: const [
-                Tab(icon: Icon(Icons.touch_app), text: 'Direct Sync'),
-                Tab(icon: Icon(Icons.telegram), text: 'Telegram Hub'),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildDirectUploadTab(), _buildTelegramTab()],
-            ),
-          ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-            ),
-            child: const Text(
-              'Live Synchronization Feed',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 5,
-            child: Container(color: Colors.white, child: _buildRecentUploads()),
-          ),
-        ],
-      ),
+    );
+
+    try {
+      final draftCards = await GeminiService.structureProblemCard(raw);
+      for (var draftCard in draftCards) {
+        await FirebaseFirestore.instance.collection('problem_cards').doc(draftCard.id).set(draftCard.toJson());
+      }
+      await FirebaseFirestore.instance.collection('raw_uploads').doc(raw.id).update({'status': 'done'});
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      await _handleExtractionFailure(raw, e);
+    }
+  }
+
+  Future<void> _handleExtractionFailure(RawUpload raw, dynamic e) async {
+    await FirebaseFirestore.instance.collection('raw_uploads').doc(raw.id).update({'status': 'extraction_failed'});
+    await FirebaseFirestore.instance.collection('problem_cards').doc(raw.id).set({
+      'id': raw.id,
+      'ngoId': raw.ngoId,
+      'issueType': IssueType.other.name,
+      'locationWard': 'Manual Review Required',
+      'locationCity': 'Manual Review Required',
+      'locationGeoPoint': const GeoPoint(0, 0),
+      'severityLevel': SeverityLevel.medium.name,
+      'affectedCount': 0,
+      'description': 'AI extraction failed. Manual entry required. ($e)',
+      'confidenceScore': 0.0,
+      'status': ProblemStatus.extraction_failed.name,
+      'priorityScore': 0.0,
+      'severityContrib': 0.0,
+      'scaleContrib': 0.0,
+      'recencyContrib': 0.0,
+      'gapContrib': 0.0,
+      'createdAt': FieldValue.serverTimestamp(),
+      'anonymized': true,
+    }, SetOptions(merge: true));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Extraction failed. Review in queue.'), backgroundColor: SahayaColors.coral));
+    }
+  }
+
+  String _fmtTime(DateTime dt) {
+    final d = DateTime.now().difference(dt);
+    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
+  }
+
+  Widget _miniPill(BuildContext context, String text, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Text(text, style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.w900, color: fg)),
     );
   }
 }

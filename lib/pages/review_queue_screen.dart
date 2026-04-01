@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/problem_card.dart';
 import '../models/raw_upload.dart';
-import '../components/review_card_dialog.dart';
 import '../components/list_shimmer.dart';
+import '../theme/sahaya_theme.dart';
+import 'review_detail_screen.dart';
 import 'manual_entry_form.dart';
 
 class ReviewQueueScreen extends StatelessWidget {
@@ -13,196 +15,184 @@ class ReviewQueueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
       appBar: AppBar(
-        title: const Text(
-          'Pending Human Review Queue',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        title: Text('Review Queue', 
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: ngoId)
-            .where(
-              'status',
-              whereIn: [
-                ProblemStatus.pending_review.name,
-                ProblemStatus.extraction_failed.name,
-              ],
-            )
+            .where('status', whereIn: [
+              ProblemStatus.pending_review.name,
+              ProblemStatus.extraction_failed.name,
+            ])
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Structural Generic Reject natively intercepted: ${snapshot.error}",
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const ListShimmer(itemCount: 6);
           }
-
           final docs = snapshot.data?.docs ?? [];
+          
           if (docs.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 64,
-                    color: Colors.green,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Target Review Queue is entirely purged.',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return _emptyState(context);
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             itemCount: docs.length,
-            padding: const EdgeInsets.all(8),
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final struct = () {
-                try {
-                  return ProblemCard.fromJson({...data, 'id': docs[index].id});
-                } catch (_) {
-                  return ProblemCard(
-                    id: docs[index].id,
-                    ngoId: data['ngoId'] as String? ?? ngoId,
-                    issueType: IssueType.other,
-                    locationWard: 'Manual Review Required',
-                    locationCity: 'Manual Review Required',
-                    locationGeoPoint: const GeoPoint(0, 0),
-                    severityLevel: SeverityLevel.medium,
-                    affectedCount: 0,
-                    description:
-                        'Extraction failed for this upload. Please complete manual entry.',
-                    confidenceScore: 0,
-                    status: ProblemStatus.extraction_failed,
-                    priorityScore: 0,
-                    severityContrib: 0,
-                    scaleContrib: 0,
-                    recencyContrib: 0,
-                    gapContrib: 0,
-                    createdAt: DateTime.now(),
-                    anonymized: true,
-                  );
-                }
-              }();
-              final isExtractionFailed =
-                  struct.status == ProblemStatus.extraction_failed;
-
-              Color confidenceColor = Colors.green;
-              if (struct.confidenceScore < 0.70) {
-                confidenceColor = Colors.red;
-              } else if (struct.confidenceScore <= 0.85) {
-                confidenceColor = Colors.orange;
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              
+              ProblemCard card;
+              try {
+                card = ProblemCard.fromJson({...data, 'id': doc.id});
+              } catch (_) {
+                card = ProblemCard(
+                  id: doc.id,
+                  ngoId: ngoId,
+                  issueType: IssueType.other,
+                  locationWard: 'Manual Review',
+                  locationCity: 'Required',
+                  locationGeoPoint: const GeoPoint(0, 0),
+                  severityLevel: SeverityLevel.medium,
+                  affectedCount: 0,
+                  description: 'AI Extraction failed or data is corrupted. Please review manually.',
+                  confidenceScore: 0,
+                  status: ProblemStatus.extraction_failed,
+                  priorityScore: 0,
+                  severityContrib: 0,
+                  scaleContrib: 0,
+                  recencyContrib: 0,
+                  gapContrib: 0,
+                  createdAt: DateTime.now(),
+                  anonymized: true,
+                );
               }
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.grey.withOpacity(0.2)),
-                ),
-                elevation: 0,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  leading: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: struct.confidenceScore,
-                        backgroundColor: Colors.grey[100],
-                        color: confidenceColor,
-                      ),
-                      const Icon(
-                        Icons.science,
-                        size: 16,
-                        color: Colors.black54,
-                      ),
-                    ],
-                  ),
-                  title: Text(
-                    struct.issueType.name.toUpperCase(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                  subtitle: Text(
-                    isExtractionFailed
-                        ? 'Manual entry required before approval'
-                        : "${struct.locationWard}, ${struct.locationCity}\nSeverity: ${struct.severityLevel.name.toUpperCase()}",
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.blueAccent,
-                  ),
-                  onTap: () async {
-                    if (isExtractionFailed) {
-                      final rawDoc = await FirebaseFirestore.instance
-                          .collection('raw_uploads')
-                          .doc(struct.id)
-                          .get();
-                      if (!context.mounted) return;
-
-                      if (!rawDoc.exists || rawDoc.data() == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Raw upload not found for manual entry.',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      final upload = RawUpload.fromJson({
-                        ...rawDoc.data()!,
-                        'id': rawDoc.id,
-                      });
-
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (_) => ManualEntryFormDialog(upload: upload),
-                      );
-                      return;
-                    }
-
-                    showDialog(
-                      context: context,
-                      builder: (_) => ReviewCardDialog(draftCard: struct),
-                    );
-                  },
-                ),
-              );
+              return _ReviewBlock(card: card);
             },
           );
         },
       ),
+    );
+  }
+
+  Widget _emptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.done_all_rounded, size: 64, color: SahayaColors.emerald.withValues(alpha: 0.5)),
+          const SizedBox(height: 16),
+          Text('Nothing to review!', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18)),
+          const SizedBox(height: 8),
+          Text('All reports have been processed.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewBlock extends StatelessWidget {
+  final ProblemCard card;
+  const _ReviewBlock({required this.card});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Border color based on confidence or status
+    Color borderColor = SahayaColors.amber;
+    if (card.status == ProblemStatus.extraction_failed) {
+      borderColor = SahayaColors.coral;
+    } else if (card.confidenceScore > 0.8) {
+      borderColor = SahayaColors.emerald;
+    }
+
+    return GestureDetector(
+      onTap: () => _navigateToDetail(context),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? SahayaColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor.withValues(alpha: 0.6), width: 2),
+          boxShadow: [sahayaCardShadow(context)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _miniPill(context, 'PENDING REVIEW', borderColor.withValues(alpha: 0.1), borderColor),
+                const Spacer(),
+                if (card.status != ProblemStatus.extraction_failed)
+                  Text('${(card.confidenceScore * 100).toInt()}% CONFIDENCE', 
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w900, color: borderColor, fontSize: 10, letterSpacing: 0.5)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(card.description, 
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3), 
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.location_on_outlined, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Expanded(child: Text('${card.locationWard}, ${card.locationCity}', 
+                  style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
+                Icon(Icons.auto_awesome_outlined, size: 14, color: cs.primary),
+                const SizedBox(width: 4),
+                Text('AI DRAFT', style: GoogleFonts.inter(fontSize: 10, color: cs.primary, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToDetail(BuildContext context) async {
+    if (card.status == ProblemStatus.extraction_failed) {
+      // Find the raw upload first
+      final snap = await FirebaseFirestore.instance.collection('raw_uploads').where('problemCardId', isEqualTo: card.id).limit(1).get();
+      if (snap.docs.isNotEmpty) {
+        final upload = RawUpload.fromJson({...snap.docs.first.data(), 'id': snap.docs.first.id});
+        if (context.mounted) {
+          showDialog(context: context, builder: (_) => ManualEntryFormDialog(upload: upload));
+        }
+      } else {
+        // Just show a message or generic fallback
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Raw evidence not found for this card.')));
+        }
+      }
+      return;
+    }
+
+    // Normal review
+    final linkSnap = await FirebaseFirestore.instance.collection('raw_uploads').where('problemCardId', isEqualTo: card.id).limit(1).get();
+    
+    if (linkSnap.docs.isNotEmpty && context.mounted) {
+      final upload = RawUpload.fromJson({...linkSnap.docs.first.data(), 'id': linkSnap.docs.first.id});
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewDetailScreen(upload: upload, extraction: card.toJson())));
+    } else {
+       if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Raw evidence not found for this card.')));
+        }
+    }
+  }
+
+  Widget _miniPill(BuildContext context, String text, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(text, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
     );
   }
 }

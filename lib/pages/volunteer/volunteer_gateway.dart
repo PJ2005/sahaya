@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../theme/sahaya_theme.dart';
 import 'volunteer_home_screen.dart';
 import 'volunteer_onboarding_screen.dart';
 
@@ -23,29 +25,18 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
 
   Future<void> _startAuthFlow() async {
     try {
-      final userFallback = FirebaseAuth.instance.currentUser;
-      UserCredential? credential;
-
-      if (userFallback == null) {
-        credential = await FirebaseAuth.instance.signInAnonymously();
-        _uid = credential.user!.uid;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        final cred = await FirebaseAuth.instance.signInAnonymously();
+        _uid = cred.user!.uid;
       } else {
-        _uid = userFallback.uid;
+        _uid = user.uid;
       }
-
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Auth failed: $e',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Auth failed: $e'), backgroundColor: SahayaColors.coral),
         );
       }
     }
@@ -53,18 +44,27 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text(
-                'Connecting to Sahaya...',
-                style: TextStyle(color: Colors.grey),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.favorite_rounded, color: cs.primary, size: 32),
               ),
+              const SizedBox(height: 24),
+              SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: cs.primary, strokeWidth: 2.5)),
+              const SizedBox(height: 16),
+              Text('Connecting...', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
             ],
           ),
         ),
@@ -72,38 +72,19 @@ class _VolunteerGatewayState extends State<VolunteerGateway> {
     }
 
     if (_uid == null) {
-      return const Scaffold(
-        body: Center(child: Text('Authentication failed. Please restart.')),
-      );
+      return const Scaffold(body: Center(child: Text('Authentication failed. Please restart.')));
     }
 
     return StreamBuilder<DocumentSnapshot>(
-      // Listen to the volunteer profile
-      stream: FirebaseFirestore.instance
-          .collection('volunteer_profiles')
-          .doc(_uid)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('volunteer_profiles').doc(_uid).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return Scaffold(body: Center(child: CircularProgressIndicator(color: cs.primary)));
         }
-
-        if (snapshot.hasError) {
-          return Scaffold(
-            body: Center(child: Text('Database Error: ${snapshot.error}')),
-          );
-        }
-
-        // If the document doesn't exist, route to onboarding.
-        // If it does, route to home.
         if (snapshot.hasData && snapshot.data!.exists) {
-          // We pass the uid so the home screen can load user-specific data
           return VolunteerHomeScreen(uid: _uid!);
-        } else {
-          return const VolunteerOnboardingScreen();
         }
+        return const VolunteerOnboardingScreen();
       },
     );
   }

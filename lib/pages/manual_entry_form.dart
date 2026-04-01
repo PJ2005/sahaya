@@ -165,7 +165,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
         ElevatedButton(
           onPressed: _isSaving ? null : _saveManually,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blueAccent,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             foregroundColor: Colors.white,
           ),
           child: _isSaving

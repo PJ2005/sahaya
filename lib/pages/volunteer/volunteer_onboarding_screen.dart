@@ -3,252 +3,137 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/volunteer_profile.dart';
+import '../../theme/sahaya_theme.dart';
 
 class VolunteerOnboardingScreen extends StatefulWidget {
   const VolunteerOnboardingScreen({super.key});
 
   @override
-  State<VolunteerOnboardingScreen> createState() =>
-      _VolunteerOnboardingScreenState();
+  State<VolunteerOnboardingScreen> createState() => _VolunteerOnboardingScreenState();
 }
 
 class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
-  final PageController _pageController = PageController();
-  int _currentIndex = 0;
+  final PageController _pageCtrl = PageController();
+  int _step = 0;
 
-  // Step 1: Location & Radius
-  GeoPoint? _currentLocation;
-  double _radiusKm = 10.0;
-  bool _gettingLocation = false;
-  String? _locationError;
+  // Step 1
+  GeoPoint? _loc;
+  double _radius = 10;
+  bool _fetching = false;
+  String? _locError;
 
-  // Step 2: Skills
-  final List<String> _availableSkills = [
-    'communication',
-    'data_entry',
-    'transport',
-    'technical',
-    'medical',
-    'education',
-    'physical_labor',
-    'community_outreach',
-  ];
-  final Set<String> _selectedSkills = {};
+  // Step 2
+  final _skills = ['communication', 'data_entry', 'transport', 'technical', 'medical', 'education', 'physical_labor', 'community_outreach'];
+  final Set<String> _picked = {};
 
-  // Step 3: Language
-  final List<String> _languages = [
-    'Tamil',
-    'Telugu',
-    'Hindi',
-    'English',
-    'Other',
-  ];
-  String? _selectedLanguage;
+  // Step 3
+  final _languages = ['Tamil', 'Telugu', 'Hindi', 'English', 'Other'];
+  String? _lang;
 
-  bool _isSaving = false;
+  bool _saving = false;
 
-  void _nextPage() {
-    if (_currentIndex == 0 && _currentLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please share your location to continue')),
-      );
-      return;
-    }
-    if (_currentIndex == 1 && _selectedSkills.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one skill')),
-      );
-      return;
-    }
-
-    if (_currentIndex < 2) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      if (_selectedLanguage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a language preference')),
-        );
-        return;
-      }
-      _completeOnboarding();
+  void _next() {
+    if (_step == 0 && _loc == null) { _snack('Share your location to continue'); return; }
+    if (_step == 1 && _picked.isEmpty) { _snack('Pick at least one skill'); return; }
+    if (_step < 2) { _pageCtrl.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut); }
+    else {
+      if (_lang == null) { _snack('Select a language'); return; }
+      _complete();
     }
   }
 
-  Future<void> _fetchLocation() async {
-    setState(() {
-      _gettingLocation = true;
-      _locationError = null;
-    });
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: SahayaColors.amber));
+  }
 
+  Future<void> _getLocation() async {
+    setState(() { _fetching = true; _locError = null; });
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Location permission denied.');
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          'Location permissions are permanently denied, we cannot request permissions. Please enable them in app settings.',
-        );
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-      );
-      setState(() {
-        _currentLocation = GeoPoint(position.latitude, position.longitude);
-        _gettingLocation = false;
-      });
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied) throw Exception('Permission denied');
+      if (perm == LocationPermission.deniedForever) throw Exception('Location permanently denied — enable in settings');
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      setState(() { _loc = GeoPoint(pos.latitude, pos.longitude); _fetching = false; });
     } catch (e) {
-      setState(() {
-        _gettingLocation = false;
-        _locationError = e.toString();
-      });
+      setState(() { _fetching = false; _locError = e.toString(); });
     }
   }
 
-  Future<void> _completeOnboarding() async {
-    setState(() => _isSaving = true);
+  Future<void> _complete() async {
+    setState(() => _saving = true);
     try {
       final user = FirebaseAuth.instance.currentUser!;
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-
+      final token = await FirebaseMessaging.instance.getToken();
       final profile = VolunteerProfile(
-        id: user.uid,
-        uid: user.uid,
-        locationGeoPoint: _currentLocation!,
-        radiusKm: _radiusKm,
-        skillTags: _selectedSkills.toList(),
-        languagePref: _selectedLanguage!,
-        availabilityWindowActive: true,
-        availabilityUpdatedAt: DateTime.now(),
-        fcmToken: fcmToken,
+        id: user.uid, uid: user.uid, locationGeoPoint: _loc!, radiusKm: _radius,
+        skillTags: _picked.toList(), languagePref: _lang!, availabilityWindowActive: true,
+        availabilityUpdatedAt: DateTime.now(), fcmToken: token,
       );
-
-      // Save to Firestore
-      await FirebaseFirestore.instance
-          .collection('volunteer_profiles')
-          .doc(user.uid)
-          .set(profile.toJson());
-      // The gateway stream builder will automatically react to this document creation and route to VolunteerHome.
+      await FirebaseFirestore.instance.collection('volunteer_profiles').doc(user.uid).set(profile.toJson());
     } catch (e) {
-      if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save profile: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (mounted) { setState(() => _saving = false); _snack('Failed: $e'); }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Volunteer Profile',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Colors.blueAccent,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: Text('Join Sahaya', style: GoogleFonts.inter(fontWeight: FontWeight.w800))),
       body: Column(
         children: [
-          // Progress indicator
-          LinearProgressIndicator(
-            value: (_currentIndex + 1) / 3,
-            backgroundColor: Colors.blue[50],
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+          // Progress
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (_step + 1) / 3,
+                minHeight: 5,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkBorder : const Color(0xFFE5E7EB),
+                valueColor: AlwaysStoppedAnimation(cs.primary),
+              ),
+            ),
           ),
 
           Expanded(
             child: PageView(
-              controller: _pageController,
+              controller: _pageCtrl,
               physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (idx) => setState(() => _currentIndex = idx),
-              children: [
-                _buildLocationStep(),
-                _buildSkillsStep(),
-                _buildLanguageStep(),
-              ],
+              onPageChanged: (i) => setState(() => _step = i),
+              children: [_locationStep(), _skillsStep(), _languageStep()],
             ),
           ),
 
-          // Bottom Bar Navigation
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (_currentIndex > 0)
-                  TextButton(
-                    onPressed: () => _pageController.previousPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    ),
-                    child: const Text(
-                      'Back',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox.shrink(),
-
-                ElevatedButton(
-                  onPressed: _isSaving ? null : _nextPage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+          // Bottom bar
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Row(
+                children: [
+                  if (_step > 0)
+                    TextButton(
+                      onPressed: () => _pageCtrl.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+                      child: Text('Back', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  const Spacer(),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _next,
+                      child: _saving
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text(_step == 2 ? 'Complete' : 'Continue', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                     ),
                   ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          _currentIndex == 2 ? 'Complete Profile' : 'Continue',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -256,163 +141,89 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
     );
   }
 
-  // ==== STEP 1: LOCATION ====
-  Widget _buildLocationStep() {
+  // ──── Step 1 ────
+  Widget _locationStep() {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(28),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.my_location, size: 64, color: Colors.blueAccent),
-          const SizedBox(height: 24),
-          const Text(
-            'Where are you?',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+          Container(
+            width: 80, height: 80,
+            decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(24)),
+            child: Icon(Icons.my_location_rounded, size: 40, color: cs.primary),
           ),
+          const SizedBox(height: 28),
+          Text('Where are you?', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           const SizedBox(height: 8),
-          const Text(
-            'We need your location to find nearby community needs.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54),
-          ),
+          Text('We match you with tasks near your location.', style: GoogleFonts.inter(color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
           const SizedBox(height: 32),
 
-          if (_currentLocation == null) ...[
-            ElevatedButton.icon(
-              onPressed: _gettingLocation ? null : _fetchLocation,
-              icon: _gettingLocation
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        color: Colors.blueAccent,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Icon(Icons.gps_fixed),
-              label: Text(
-                _gettingLocation ? 'Finding you...' : 'Share My Location',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[50],
-                foregroundColor: Colors.blueAccent,
-                padding: const EdgeInsets.all(16),
-                elevation: 0,
+          if (_loc == null) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: _fetching ? null : _getLocation,
+                icon: _fetching ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: cs.primary, strokeWidth: 2)) : const Icon(Icons.gps_fixed_rounded),
+                label: Text(_fetching ? 'Finding...' : 'Share Location'),
               ),
             ),
-            if (_locationError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(
-                  _locationError!,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+            if (_locError != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_locError!, style: GoogleFonts.inter(color: SahayaColors.coral, fontSize: 13), textAlign: TextAlign.center)),
           ] else ...[
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green),
-                  SizedBox(width: 12),
-                  Text(
-                    'Location secured',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: SahayaColors.emeraldMuted, borderRadius: BorderRadius.circular(14)),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.check_circle_rounded, color: SahayaColors.emerald),
+                const SizedBox(width: 10),
+                Text('Location secured', style: GoogleFonts.inter(color: SahayaColors.emeraldDark, fontWeight: FontWeight.w600)),
+              ]),
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Match Radius',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            const SizedBox(height: 28),
+            Text('Match Radius', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
             Slider(
-              value: _radiusKm,
-              min: 5,
-              max: 50,
-              divisions: 3,
-              label: '${_radiusKm.round()} km',
-              onChanged: (val) => setState(() => _radiusKm = val),
-              activeColor: Colors.blueAccent,
+              value: _radius, min: 5, max: 50, divisions: 9,
+              label: '${_radius.round()} km',
+              onChanged: (v) => setState(() => _radius = v),
+              activeColor: cs.primary,
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text('5km', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                Text(
-                  '50km',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('5 km', style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+              Text('50 km', style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+            ]),
           ],
         ],
       ),
     );
   }
 
-  // ==== STEP 2: SKILLS ====
-  Widget _buildSkillsStep() {
+  // ──── Step 2 ────
+  Widget _skillsStep() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(28),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Your Skills',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
+          Text('Your Skills', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           const SizedBox(height: 8),
-          const Text(
-            'Select tags that match your capabilities.',
-            style: TextStyle(color: Colors.black54),
-          ),
-          const SizedBox(height: 24),
+          Text('Pick what you\'re good at.', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
+          const SizedBox(height: 28),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _availableSkills.map((skill) {
-              final isSelected = _selectedSkills.contains(skill);
+            spacing: 10, runSpacing: 10,
+            children: _skills.map((s) {
+              final on = _picked.contains(s);
               return FilterChip(
-                label: Text(
-                  skill.replaceAll('_', ' '),
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.blueAccent,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedSkills.add(skill);
-                    } else {
-                      _selectedSkills.remove(skill);
-                    }
-                  });
-                },
-                backgroundColor: Colors.blue[50],
-                selectedColor: Colors.blueAccent,
+                label: Text(s.replaceAll('_', ' '), style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: on ? Colors.white : cs.onSurface)),
+                selected: on,
+                onSelected: (v) => setState(() { v ? _picked.add(s) : _picked.remove(s); }),
+                backgroundColor: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkSurface : const Color(0xFFF3F4F6),
+                selectedColor: cs.primary,
                 checkmarkColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: isSelected ? Colors.transparent : Colors.blue[200]!,
-                  ),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28), side: BorderSide(color: on ? cs.primary : (Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkBorder : SahayaColors.lightBorder))),
               );
             }).toList(),
           ),
@@ -421,36 +232,25 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
     );
   }
 
-  // ==== STEP 3: LANGUAGE ====
-  Widget _buildLanguageStep() {
+  // ──── Step 3 ────
+  Widget _languageStep() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(28),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Preferred Language',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
+          Text('Language', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           const SizedBox(height: 8),
-          const Text(
-            'Which language do you prefer to receive tasks in?',
-            style: TextStyle(color: Colors.black54),
-          ),
-          const SizedBox(height: 24),
-          ..._languages.map((lang) {
-            return RadioListTile<String>(
-              title: Text(
-                lang,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              value: lang,
-              groupValue: _selectedLanguage,
-              onChanged: (val) => setState(() => _selectedLanguage = val),
-              activeColor: Colors.blueAccent,
-              contentPadding: EdgeInsets.zero,
-            );
-          }),
+          Text('Preferred language for task briefings.', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
+          const SizedBox(height: 28),
+          ..._languages.map((l) => RadioListTile<String>(
+            title: Text(l, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            value: l, groupValue: _lang,
+            onChanged: (v) => setState(() => _lang = v),
+            activeColor: cs.primary,
+            contentPadding: EdgeInsets.zero,
+          )),
         ],
       ),
     );
