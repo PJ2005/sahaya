@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
@@ -5,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/raw_upload.dart';
 import '../models/problem_card.dart';
 import '../services/gemini_service.dart';
@@ -24,6 +26,7 @@ class UploadScreen extends StatefulWidget {
 class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final TextEditingController _pastedTextController = TextEditingController();
   bool _isUploading = false;
 
   @override
@@ -32,48 +35,41 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     _tabController = TabController(length: 2, vsync: this);
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _pastedTextController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickAndUploadFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'csv', 'docx'],
+        allowedExtensions: [
+          'pdf',
+          'png',
+          'jpg',
+          'jpeg',
+          'csv',
+          'docx',
+          'txt',
+          'mp3',
+          'wav',
+          'm4a',
+          'aac',
+          'ogg',
+        ],
       );
 
       if (result != null && result.files.single.path != null) {
         setState(() => _isUploading = true);
-
-        final cloudinary = CloudinaryPublic(
-          dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'demo',
-          dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'preset',
-          cache: false,
-        );
-
-        final String path = result.files.single.path!;
-        final String ext = result.files.single.extension?.toLowerCase() ?? '';
-
-        CloudinaryResponse response = await cloudinary.uploadFile(
-          CloudinaryFile.fromFile(
-            path,
-            resourceType: CloudinaryResourceType.Auto,
+        await _uploadPath(
+          path: result.files.single.path!,
+          fileType: _fileTypeFromExtension(
+            result.files.single.extension?.toLowerCase() ?? '',
           ),
         );
-
-        String fileType = 'document';
-        if (['png', 'jpg', 'jpeg'].contains(ext)) fileType = 'image';
-        if (ext == 'csv') fileType = 'csv';
-
-        final String docId = const Uuid().v4();
-        final rawUpload = RawUpload(
-          id: docId,
-          ngoId: widget.ngoId,
-          cloudinaryUrl: response.secureUrl,
-          cloudinaryPublicId: response.publicId,
-          fileType: fileType,
-          uploadedAt: DateTime.now(),
-          status: UploadStatus.pending,
-        );
-
-        await _db.collection('raw_uploads').doc(docId).set(rawUpload.toJson());
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -90,6 +86,91 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
+  }
+
+  Future<void> _uploadPastedText() async {
+    final text = _pastedTextController.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Paste or type some field notes first.'),
+          backgroundColor: SahayaColors.coral,
+        ),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _isUploading = true);
+      final tempDir = await getTemporaryDirectory();
+      final file = File(
+        '${tempDir.path}\\survey_notes_${DateTime.now().millisecondsSinceEpoch}.txt',
+      );
+      await file.writeAsString(text);
+      await _uploadPath(path: file.path, fileType: 'text');
+      _pastedTextController.clear();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Text notes uploaded successfully!'),
+            backgroundColor: SahayaColors.emerald,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Text upload failed: $e'),
+            backgroundColor: SahayaColors.coral,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _uploadPath({
+    required String path,
+    required String fileType,
+  }) async {
+    final cloudinary = CloudinaryPublic(
+      dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'demo',
+      dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'preset',
+      cache: false,
+    );
+
+    final response = await cloudinary.uploadFile(
+      CloudinaryFile.fromFile(
+        path,
+        resourceType: CloudinaryResourceType.Auto,
+      ),
+    );
+
+    final String docId = const Uuid().v4();
+    final rawUpload = RawUpload(
+      id: docId,
+      ngoId: widget.ngoId,
+      cloudinaryUrl: response.secureUrl,
+      cloudinaryPublicId: response.publicId,
+      fileType: fileType,
+      uploadedAt: DateTime.now(),
+      status: UploadStatus.pending,
+    );
+
+    await _db.collection('raw_uploads').doc(docId).set(rawUpload.toJson());
+  }
+
+  String _fileTypeFromExtension(String ext) {
+    if (['png', 'jpg', 'jpeg', 'webp'].contains(ext)) return 'image';
+    if (ext == 'csv') return 'csv';
+    if (ext == 'txt') return 'text';
+    if (['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga'].contains(ext)) {
+      return 'audio';
+    }
+    return 'document';
   }
 
   @override
@@ -200,15 +281,78 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   Text(_isUploading ? 'Uploading to cloud...' : 'Press to select files', 
                     style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  Text('PDF, DOCX, CSV or Images', 
+                  Text('PDF, TXT, audio notes, CSV, DOCX or images', 
                     style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? SahayaColors.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+              boxShadow: [sahayaCardShadow(context)],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.notes_rounded, color: cs.primary),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Paste field notes directly',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _pastedTextController,
+                  maxLines: 7,
+                  minLines: 5,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Paste copied survey notes, call transcripts, or rough observations here...',
+                    filled: true,
+                    fillColor:
+                        isDark ? SahayaColors.darkBg : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isUploading ? null : _uploadPastedText,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Upload pasted text for Gemini'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
-            'Files uploaded here are automatically processed by Sahaya AI to extract problem reports, severity levels, and locations.',
+            'Files, pasted notes, and voice recordings uploaded here are automatically processed by Sahaya AI to extract problem reports, severity levels, and locations.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant, height: 1.5),
           ),
@@ -278,7 +422,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                 _stepRow(context, '1', 'Install Telegram on your mobile device.'),
                 _stepRow(context, '2', 'Find @Sahaya_Helper_bot in search.'),
                 _stepRow(context, '3', 'Send the registration command copied above.'),
-                _stepRow(context, '4', 'Start forwarding reports, photos, or documents!'),
+                _stepRow(context, '4', 'Send pasted text, voice notes, text files, photos, or documents.'),
               ],
             ),
           ),
@@ -349,7 +493,15 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                     width: 40, height: 40,
                     decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                     child: Icon(
-                      raw.fileType == 'image' ? Icons.image_outlined : (raw.fileType == 'csv' ? Icons.table_chart_outlined : Icons.description_outlined),
+                      raw.fileType == 'image'
+                          ? Icons.image_outlined
+                          : raw.fileType == 'csv'
+                              ? Icons.table_chart_outlined
+                              : raw.fileType == 'audio'
+                                  ? Icons.mic_none_rounded
+                                  : raw.fileType == 'text'
+                                      ? Icons.notes_rounded
+                                      : Icons.description_outlined,
                       size: 18, color: cs.primary,
                     ),
                   ),

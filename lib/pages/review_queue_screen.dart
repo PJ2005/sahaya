@@ -38,41 +38,13 @@ class ReviewQueueScreen extends StatelessWidget {
             return _emptyState(context);
           }
 
-          return ListView.builder(
+          return ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data() as Map<String, dynamic>;
-              
-              ProblemCard card;
-              try {
-                card = ProblemCard.fromJson({...data, 'id': doc.id});
-              } catch (_) {
-                card = ProblemCard(
-                  id: doc.id,
-                  ngoId: ngoId,
-                  issueType: IssueType.other,
-                  locationWard: 'Manual Review',
-                  locationCity: 'Required',
-                  locationGeoPoint: const GeoPoint(0, 0),
-                  severityLevel: SeverityLevel.medium,
-                  affectedCount: 0,
-                  description: 'AI Extraction failed or data is corrupted. Please review manually.',
-                  confidenceScore: 0,
-                  status: ProblemStatus.extraction_failed,
-                  priorityScore: 0,
-                  severityContrib: 0,
-                  scaleContrib: 0,
-                  recencyContrib: 0,
-                  gapContrib: 0,
-                  createdAt: DateTime.now(),
-                  anonymized: true,
-                );
-              }
-
-              return _ReviewBlock(card: card);
-            },
+            children: [
+              _assistantPrompt(context),
+              const SizedBox(height: 16),
+              for (final doc in docs) _ReviewBlock(card: _safeProblemCard(doc), ngoId: ngoId),
+            ],
           );
         },
       ),
@@ -89,6 +61,88 @@ class ReviewQueueScreen extends StatelessWidget {
           Text('Nothing to review!', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18)),
           const SizedBox(height: 8),
           Text('All reports have been processed.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 20),
+          _assistantPrompt(context),
+        ],
+      ),
+    );
+  }
+
+  ProblemCard _safeProblemCard(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    try {
+      return ProblemCard.fromJson({...data, 'id': doc.id});
+    } catch (_) {
+      return ProblemCard(
+        id: doc.id,
+        ngoId: ngoId,
+        issueType: IssueType.other,
+        locationWard: 'Manual Review',
+        locationCity: 'Required',
+        locationGeoPoint: const GeoPoint(0, 0),
+        severityLevel: SeverityLevel.medium,
+        affectedCount: 0,
+        description: 'AI Extraction failed or data is corrupted. Please review manually.',
+        confidenceScore: 0,
+        status: ProblemStatus.extraction_failed,
+        priorityScore: 0,
+        severityContrib: 0,
+        scaleContrib: 0,
+        recencyContrib: 0,
+        gapContrib: 0,
+        createdAt: DateTime.now(),
+        anonymized: true,
+      );
+    }
+  }
+
+  Widget _assistantPrompt(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.auto_awesome_rounded, color: cs.primary, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Try the AI assistant — describe any change in plain English.',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Open a review item, then ask for edits like priority, wording, or field corrections.',
+                  style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Open any queued report and tap AI Assistant to describe the change you want.',
+                ),
+              ),
+            ),
+            child: const Text('Try'),
+          ),
         ],
       ),
     );
@@ -97,7 +151,8 @@ class ReviewQueueScreen extends StatelessWidget {
 
 class _ReviewBlock extends StatelessWidget {
   final ProblemCard card;
-  const _ReviewBlock({required this.card});
+  final String ngoId;
+  const _ReviewBlock({required this.card, required this.ngoId});
 
   @override
   Widget build(BuildContext context) {
@@ -158,34 +213,67 @@ class _ReviewBlock extends StatelessWidget {
   }
 
   void _navigateToDetail(BuildContext context) async {
-    if (card.status == ProblemStatus.extraction_failed) {
-      // Find the raw upload first
-      final snap = await FirebaseFirestore.instance.collection('raw_uploads').where('problemCardId', isEqualTo: card.id).limit(1).get();
-      if (snap.docs.isNotEmpty) {
-        final upload = RawUpload.fromJson({...snap.docs.first.data(), 'id': snap.docs.first.id});
-        if (context.mounted) {
-          showDialog(context: context, builder: (_) => ManualEntryFormDialog(upload: upload));
-        }
-      } else {
-        // Just show a message or generic fallback
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Raw evidence not found for this card.')));
-        }
+    final upload = await _loadLinkedUpload();
+    if (upload == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Raw evidence not found for this card.')),
+        );
       }
       return;
     }
 
-    // Normal review
-    final linkSnap = await FirebaseFirestore.instance.collection('raw_uploads').where('problemCardId', isEqualTo: card.id).limit(1).get();
-    
-    if (linkSnap.docs.isNotEmpty && context.mounted) {
-      final upload = RawUpload.fromJson({...linkSnap.docs.first.data(), 'id': linkSnap.docs.first.id});
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewDetailScreen(upload: upload, extraction: card.toJson())));
-    } else {
-       if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Raw evidence not found for this card.')));
-        }
+    if (card.status == ProblemStatus.extraction_failed) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => ManualEntryFormDialog(upload: upload),
+        );
+      }
+      return;
     }
+
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReviewDetailScreen(
+            upload: upload,
+            extraction: card.toJson(),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<RawUpload?> _loadLinkedUpload() async {
+    final db = FirebaseFirestore.instance;
+
+    // Pending-review Gemini cards are stored as rawUploadId_index.
+    final String parentUploadId = card.id.contains('_')
+        ? card.id.split('_').first
+        : card.id;
+
+    final directDoc = await db.collection('raw_uploads').doc(parentUploadId).get();
+    if (directDoc.exists) {
+      final data = directDoc.data();
+      if (data != null && data['ngoId'] == ngoId) {
+        return RawUpload.fromJson({...data, 'id': directDoc.id});
+      }
+    }
+
+    final linkedSnap = await db
+        .collection('raw_uploads')
+        .where('ngoId', isEqualTo: ngoId)
+        .where('problemCardId', isEqualTo: card.id)
+        .limit(1)
+        .get();
+
+    if (linkedSnap.docs.isEmpty) return null;
+    return RawUpload.fromJson({
+      ...linkedSnap.docs.first.data(),
+      'id': linkedSnap.docs.first.id,
+    });
   }
 
   Widget _miniPill(BuildContext context, String text, Color bg, Color fg) {

@@ -46,12 +46,26 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Future<Map<String, dynamic>> _fetchTaskContext() async {
     if (widget.matchRecordId.isEmpty) {
-      return {'skills': <String>[], 'problem': <String, dynamic>{}, 'ngoName': 'Coordinator', 'ngoEmail': '', 'ngoPhone': ''};
+      return {
+        'skills': <String>[],
+        'problem': <String, dynamic>{},
+        'match': <String, dynamic>{},
+        'ngoName': 'Coordinator',
+        'ngoEmail': '',
+        'ngoPhone': '',
+      };
     }
 
     final matchDoc = await FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId).get();
     if (!matchDoc.exists) {
-      return {'skills': <String>[], 'problem': <String, dynamic>{}, 'ngoName': 'Coordinator', 'ngoEmail': '', 'ngoPhone': ''};
+      return {
+        'skills': <String>[],
+        'problem': <String, dynamic>{},
+        'match': <String, dynamic>{},
+        'ngoName': 'Coordinator',
+        'ngoEmail': '',
+        'ngoPhone': '',
+      };
     }
 
     final volunteerId = matchDoc['volunteerId'];
@@ -70,6 +84,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     return {
       'skills': volunteerDoc.exists ? List<String>.from(volunteerDoc['skillTags'] ?? volunteerDoc['skills'] ?? []) : <String>[],
       'problem': problemDoc.exists ? problemDoc.data()! : {},
+      'match': matchDoc.data() ?? <String, dynamic>{},
       'ngoName': ngoName, 'ngoEmail': ngoEmail, 'ngoPhone': ngoPhone,
     };
   }
@@ -121,6 +136,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         final ctx = snapshot.data ?? {};
         final volunteerSkills = ctx['skills'] as List<String>? ?? [];
         final problemData = ctx['problem'] as Map<String, dynamic>? ?? {};
+        final matchData = ctx['match'] as Map<String, dynamic>? ?? {};
         _ngoName = ctx['ngoName'] as String? ?? 'Coordinator';
         _ngoEmail = ctx['ngoEmail'] as String? ?? '';
         _ngoPhone = ctx['ngoPhone'] as String? ?? '';
@@ -170,6 +186,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           _chip(widget.initialTask.taskType.name.replaceAll('_', ' '), isDark ? SahayaColors.darkBorder : const Color(0xFFF3F4F6), cs.onSurface.withValues(alpha: 0.6)),
                         ],
                       ),
+                      if (_buildMatchExplanation(matchData)?.isNotEmpty ?? false) ...[
+                        const SizedBox(height: 12),
+                        _matchExplanationCard(context, matchData, isDark),
+                      ],
                       const SizedBox(height: 24),
 
                       // ─── Description ───
@@ -308,6 +328,62 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(28)),
     child: Text(text, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fg)),
   );
+
+  Widget _matchExplanationCard(BuildContext context, Map<String, dynamic> matchData, bool isDark) {
+    final explanation = _buildMatchExplanation(matchData) ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? SahayaColors.darkSurface : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.tune_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Matched because: $explanation.',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _buildMatchExplanation(Map<String, dynamic> matchData) {
+    final parts = <String>[];
+
+    final distanceKm = (matchData['distanceKm'] as num?)?.toDouble();
+    if (distanceKm != null) {
+      parts.add('within ${distanceKm.round()}km');
+    }
+
+    final skillOverlap = (matchData['skillOverlap'] as num?)?.toInt();
+    final requiredSkills = widget.initialTask.skillTags.length;
+    if (skillOverlap != null && requiredSkills > 0) {
+      parts.add('$skillOverlap of $requiredSkills skills overlap');
+    }
+
+    final availabilityBonus = (matchData['availabilityBonus'] as num?)?.toDouble() ?? 0;
+    if (availabilityBonus > 0) {
+      parts.add('available this weekend');
+    }
+
+    if (parts.isEmpty) return null;
+    return parts.join(' · ');
+  }
 
   Widget _logisticRow(IconData icon, String title, String value, bool isDark) => Padding(
     padding: const EdgeInsets.only(bottom: 14),

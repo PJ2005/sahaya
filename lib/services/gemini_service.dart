@@ -46,7 +46,7 @@ class GeminiService {
 
     final String promptText = """
 You are a massive array-extraction agent for NGO community surveys. 
-The input will explicitly be a sequence of data, such as a nested array of CSV rows, Excel coordinates, or OCR text covering multiple separate issues.
+The input will explicitly be a sequence of data, such as a nested array of CSV rows, Excel coordinates, OCR text, pasted field notes, or spoken survey audio covering multiple separate issues.
 Extract every single independent field problem into its own logical structure.
 Return ONLY a valid geometric JSON Array `[...]` of mapped objects, strictly without markdown wrappers. 
 If you only detect ONE single issue, STILL wrap it natively as a 1-item JSON array.
@@ -67,9 +67,11 @@ If a field cannot be mathematically determined for a specific object, inject nul
 
     bool isTextPayload =
         upload.fileType == 'csv' ||
+        upload.fileType == 'text' ||
         upload.fileType == 'document' ||
         uri.contains('.pdf') ||
         uri.contains('.csv') ||
+        uri.contains('.txt') ||
         uri.contains('.xlsx') ||
         uri.contains('.xls');
 
@@ -77,9 +79,14 @@ If a field cannot be mathematically determined for a specific object, inject nul
       final text = await ExtractionService.extractText(upload);
       parts.add(TextPart("PAYLOAD NATIVE DATA:\n$text"));
     } else {
-      String mime = 'image/jpeg';
-      if (uri.contains('.png')) mime = 'image/png';
-      parts.add(DataPart(mime, bytes));
+      if (upload.fileType == 'audio') {
+        parts.add(
+          TextPart(
+            'The attached media is an audio note from a field worker. Infer the spoken issues and structure them into separate problems.',
+          ),
+        );
+      }
+      parts.add(DataPart(_mimeTypeForUpload(upload.fileType, uri), bytes));
     }
 
     try {
@@ -240,5 +247,93 @@ For removed items, simply omit them from the output array.
     rawText = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
     final List<dynamic> parsed = jsonDecode(rawText);
     return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  static Future<Map<String, String>> analyzeProofPhotos({
+    required String taskType,
+    required List<String> photoUrls,
+  }) async {
+    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('Missing GEMINI_API_KEY');
+    }
+    if (photoUrls.isEmpty) {
+      return {
+        'label': 'needs_clarification',
+        'reason': 'No photos were available for analysis.',
+      };
+    }
+
+    final model = GenerativeModel(
+      model: 'gemini-flash-lite-latest',
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+      ),
+    );
+
+    final parts = <Part>[
+      TextPart('''
+You are verifying volunteer proof for an NGO admin.
+Review the attached proof photos and answer this question:
+"Does this photo show evidence of $taskType work being completed?"
+
+Return ONLY valid JSON in this exact shape:
+{"label":"likely_genuine|needs_clarification|unrelated","reason":"short explanation"}
+
+Use:
+- likely_genuine when the photos clearly support the claimed work
+- needs_clarification when the photos are ambiguous, low-detail, or incomplete
+- unrelated when the photos do not appear to show the claimed work
+'''),
+    ];
+
+    for (final photoUrl in photoUrls) {
+      try {
+        final response = await http.get(Uri.parse(photoUrl));
+        if (response.statusCode != 200) continue;
+        parts.add(DataPart(_mimeTypeForUrl(photoUrl), response.bodyBytes));
+      } catch (_) {}
+    }
+
+    if (parts.length == 1) {
+      return {
+        'label': 'needs_clarification',
+        'reason': 'Photos could not be fetched for AI verification.',
+      };
+    }
+
+    final genResponse = await model.generateContent([Content.multi(parts)]);
+    final rawText =
+        (genResponse.text ?? '{}').replaceAll('```json', '').replaceAll('```', '').trim();
+    final decoded = Map<String, dynamic>.from(jsonDecode(rawText));
+
+    final label = (decoded['label'] as String? ?? 'needs_clarification').trim();
+    final reason =
+        (decoded['reason'] as String? ?? 'The photos need a human double-check.').trim();
+
+    return {'label': label, 'reason': reason};
+  }
+
+  static String _mimeTypeForUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('.png')) return 'image/png';
+    if (lower.contains('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  static String _mimeTypeForUpload(String fileType, String url) {
+    final lower = url.toLowerCase();
+
+    if (fileType == 'audio' || lower.contains('.mp3')) return 'audio/mpeg';
+    if (lower.contains('.wav')) return 'audio/wav';
+    if (lower.contains('.m4a')) return 'audio/mp4';
+    if (lower.contains('.aac')) return 'audio/aac';
+    if (lower.contains('.ogg') || lower.contains('.oga')) return 'audio/ogg';
+
+    if (lower.contains('.png')) return 'image/png';
+    if (lower.contains('.webp')) return 'image/webp';
+    return 'image/jpeg';
   }
 }

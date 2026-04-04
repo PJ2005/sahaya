@@ -15,6 +15,7 @@ class NgoImpactDashboardScreen extends StatefulWidget {
 
 class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
   int _daysWindow = 30;
+  final Map<String, DateTime?> _uploadedAtCache = <String, DateTime?>{};
 
   @override
   Widget build(BuildContext context) {
@@ -63,28 +64,24 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                       builder: (context, matchSnapshot) {
                         if (!matchSnapshot.hasData) return const ListShimmer(itemCount: 6);
 
-                        return StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance.collection('raw_uploads').where('ngoId', isEqualTo: widget.ngoId).snapshots(),
-                          builder: (context, uploadsSnapshot) {
-                            if (!uploadsSnapshot.hasData) return const ListShimmer(itemCount: 6);
+                        return FutureBuilder<_ImpactMetrics>(
+                          future: _computeMetrics(
+                            cards,
+                            tasksSnapshot.data!.docs,
+                            matchSnapshot.data!.docs,
+                            windowStart,
+                          ),
+                          builder: (context, metricsSnapshot) {
+                            if (!metricsSnapshot.hasData) {
+                              return const ListShimmer(itemCount: 6);
+                            }
 
-                            final metrics = _computeMetrics(
-                              cards,
-                              tasksSnapshot.data!.docs,
-                              matchSnapshot.data!.docs,
-                              uploadsSnapshot.data!.docs,
-                              windowStart,
-                            );
-
+                            final metrics = metricsSnapshot.data!;
                             return ListView(
                               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                               children: [
-                                // KPI Grid
                                 _buildKpiGrid(metrics),
-                                
                                 const SizedBox(height: 24),
-
-                                // Main Chart Card
                                 _buildImpactCard(context, metrics, cs, isDark),
                                 const SizedBox(height: 20),
                               ],
@@ -234,26 +231,18 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     );
   }
 
-  _ImpactMetrics _computeMetrics(
+  Future<_ImpactMetrics> _computeMetrics(
     List<QueryDocumentSnapshot> cardDocs,
     List<QueryDocumentSnapshot> taskDocs,
     List<QueryDocumentSnapshot> matchDocs,
-    List<QueryDocumentSnapshot> uploadDocs,
     DateTime windowStart,
-  ) {
+  ) async {
     final cardById = <String, Map<String, dynamic>>{};
     final cardIds = <String>{};
     for (final doc in cardDocs) {
       final data = doc.data() as Map<String, dynamic>;
       cardById[doc.id] = data;
       cardIds.add(doc.id);
-    }
-
-    final uploadTimeById = <String, DateTime>{};
-    for (final doc in uploadDocs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final uploadedAt = _asDate(data['uploadedAt']);
-      if (uploadedAt != null) uploadTimeById[doc.id] = uploadedAt;
     }
 
     final tasksByCard = <String, List<Map<String, dynamic>>>{};
@@ -278,8 +267,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       }
       if (firstTaskTime == null || firstTaskTime.isBefore(windowStart)) continue;
 
-      final rawUploadId = _rawUploadIdForCard(entry.key);
-      final uploadedAt = uploadTimeById[rawUploadId];
+      final uploadedAt = await _uploadedAtForCard(entry.key);
       if (uploadedAt == null || firstTaskTime.isBefore(uploadedAt)) continue;
 
       delays.add(firstTaskTime.difference(uploadedAt).inMinutes / 60.0);
@@ -390,9 +378,31 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     return null;
   }
 
-  String _rawUploadIdForCard(String cardId) {
-    final parts = cardId.split('_');
-    return parts.isEmpty ? cardId : parts.first;
+  Future<DateTime?> _uploadedAtForCard(String cardId) async {
+    if (_uploadedAtCache.containsKey(cardId)) {
+      return _uploadedAtCache[cardId];
+    }
+
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('raw_uploads')
+            .where('ngoId', isEqualTo: widget.ngoId)
+            .where('problemCardId', isEqualTo: cardId)
+            .limit(1)
+            .get();
+
+      DateTime? uploadedAt;
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        uploadedAt = _asDate(data['uploadedAt']);
+      }
+
+      _uploadedAtCache[cardId] = uploadedAt;
+      return uploadedAt;
+    } catch (_) {
+      _uploadedAtCache[cardId] = null;
+      return null;
+    }
   }
 }
 

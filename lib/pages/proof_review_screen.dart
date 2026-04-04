@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../theme/sahaya_theme.dart';
+
 import '../components/list_shimmer.dart';
+import '../theme/sahaya_theme.dart';
 import 'proof_detail_screen.dart';
 
 class ProofReviewScreen extends StatelessWidget {
@@ -13,30 +14,73 @@ class ProofReviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Proof Reviews', 
-          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
+        title: Text(
+          'Proof Reviews',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w800,
+            fontSize: 24,
+            letterSpacing: -1,
+          ),
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('match_records')
-            .where('status', isEqualTo: 'proof_submitted')
+            .collection('problem_cards')
+            .where('ngoId', isEqualTo: ngoId)
             .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, cardsSnapshot) {
+          if (cardsSnapshot.connectionState == ConnectionState.waiting) {
             return const ListShimmer(itemCount: 6);
           }
-          final docs = snapshot.data?.docs ?? [];
-          
-          if (docs.isEmpty) {
-            return _emptyState(context);
-          }
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              return _ProofBlock(matchRecordId: doc.id, matchData: doc.data() as Map<String, dynamic>);
+          final cardIds = cardsSnapshot.data?.docs.map((doc) => doc.id).toSet() ?? <String>{};
+          if (cardIds.isEmpty) return _emptyState(context);
+
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+            builder: (context, tasksSnapshot) {
+              if (!tasksSnapshot.hasData) return const ListShimmer(itemCount: 6);
+
+              final taskIds = tasksSnapshot.data!.docs
+                  .where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final problemCardId = data['problemCardId'] as String? ?? '';
+                    return cardIds.contains(problemCardId);
+                  })
+                  .map((doc) => doc.id)
+                  .toSet();
+
+              if (taskIds.isEmpty) return _emptyState(context);
+
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('match_records')
+                    .where('status', isEqualTo: 'proof_submitted')
+                    .snapshots(),
+                builder: (context, matchSnapshot) {
+                  if (!matchSnapshot.hasData) return const ListShimmer(itemCount: 6);
+
+                  final pendingDocs = matchSnapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final taskId = data['taskId'] as String? ?? '';
+                    return taskIds.contains(taskId);
+                  }).toList();
+
+                  if (pendingDocs.isEmpty) return _emptyState(context);
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    itemCount: pendingDocs.length,
+                    itemBuilder: (context, index) {
+                      final doc = pendingDocs[index];
+                      return _ProofBlock(
+                        matchRecordId: doc.id,
+                        matchData: doc.data() as Map<String, dynamic>,
+                      );
+                    },
+                  );
+                },
+              );
             },
           );
         },
@@ -49,11 +93,23 @@ class ProofReviewScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.verified_user_outlined, size: 64, color: SahayaColors.emerald.withValues(alpha: 0.5)),
+          Icon(
+            Icons.verified_user_outlined,
+            size: 64,
+            color: SahayaColors.emerald.withValues(alpha: 0.5),
+          ),
           const SizedBox(height: 16),
-          Text('Nothing to review!', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18)),
+          Text(
+            'Nothing to review!',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
           const SizedBox(height: 8),
-          Text('All volunteer proofs are reviewed.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text(
+            'All volunteer proofs are reviewed.',
+            style: GoogleFonts.inter(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
@@ -63,7 +119,11 @@ class ProofReviewScreen extends StatelessWidget {
 class _ProofBlock extends StatefulWidget {
   final String matchRecordId;
   final Map<String, dynamic> matchData;
-  const _ProofBlock({required this.matchRecordId, required this.matchData});
+
+  const _ProofBlock({
+    required this.matchRecordId,
+    required this.matchData,
+  });
 
   @override
   State<_ProofBlock> createState() => _ProofBlockState();
@@ -79,12 +139,14 @@ class _ProofBlockState extends State<_ProofBlock> {
   }
 
   Future<void> _loadTask() async {
-    final id = widget.matchData['taskId'] as String? ?? '';
-    if (id.isEmpty) return;
+    final taskId = widget.matchData['taskId'] as String? ?? '';
+    if (taskId.isEmpty) return;
+
     try {
-      final doc = await FirebaseFirestore.instance.collection('tasks').doc(id).get();
-      if (doc.exists && mounted) {
-        setState(() => _taskDesc = doc.data()?['description'] as String?);
+      final taskDoc =
+          await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+      if (taskDoc.exists && mounted) {
+        setState(() => _taskDesc = taskDoc.data()?['description'] as String?);
       }
     } catch (_) {}
   }
@@ -94,17 +156,28 @@ class _ProofBlockState extends State<_ProofBlock> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final volId = (widget.matchData['volunteerId'] as String? ?? 'N/A');
-    final shortVol = volId.length > 8 ? '${volId.substring(0, 8)}…' : volId;
+    final shortVol = volId.length > 8 ? '${volId.substring(0, 8)}...' : volId;
 
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProofDetailScreen(matchRecordId: widget.matchRecordId, matchData: widget.matchData))),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProofDetailScreen(
+            matchRecordId: widget.matchRecordId,
+            matchData: widget.matchData,
+          ),
+        ),
+      ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isDark ? SahayaColors.darkSurface : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: SahayaColors.amber.withValues(alpha: 0.6), width: 2),
+          border: Border.all(
+            color: SahayaColors.amber.withValues(alpha: 0.6),
+            width: 2,
+          ),
           boxShadow: [sahayaCardShadow(context)],
         ),
         child: Column(
@@ -112,23 +185,59 @@ class _ProofBlockState extends State<_ProofBlock> {
           children: [
             Row(
               children: [
-                _miniPill(context, 'VERIFICATION PENDING', SahayaColors.amber.withValues(alpha: 0.1), SahayaColors.amber),
+                _miniPill(
+                  context,
+                  'VERIFICATION PENDING',
+                  SahayaColors.amber.withValues(alpha: 0.1),
+                  SahayaColors.amber,
+                ),
                 const Spacer(),
-                Icon(Icons.arrow_forward_ios_rounded, size: 12, color: cs.onSurfaceVariant),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 12,
+                  color: cs.onSurfaceVariant,
+                ),
               ],
             ),
             const SizedBox(height: 14),
-            Text(_taskDesc ?? 'Loading task details...', 
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3), 
-              maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(
+              _taskDesc ?? 'Loading task details...',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.person_pin_outlined, size: 14, color: cs.onSurfaceVariant),
+                Icon(
+                  Icons.person_pin_outlined,
+                  size: 14,
+                  color: cs.onSurfaceVariant,
+                ),
                 const SizedBox(width: 4),
-                Expanded(child: Text('Volunteer $shortVol', 
-                  style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
-                Text('TAP TO REVIEW', style: GoogleFonts.inter(fontSize: 9, color: SahayaColors.amber, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                Expanded(
+                  child: Text(
+                    'Volunteer $shortVol',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Text(
+                  'TAP TO REVIEW',
+                  style: GoogleFonts.inter(
+                    fontSize: 9,
+                    color: SahayaColors.amber,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ],
             ),
           ],
@@ -140,8 +249,18 @@ class _ProofBlockState extends State<_ProofBlock> {
   Widget _miniPill(BuildContext context, String text, Color bg, Color fg) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(text, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: fg,
+        ),
+      ),
     );
   }
 }

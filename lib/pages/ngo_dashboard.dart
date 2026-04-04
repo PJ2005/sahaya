@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'upload_screen.dart';
 import 'review_queue_screen.dart';
 import 'ngo_home_screen.dart';
@@ -16,6 +17,9 @@ class NgoDashboard extends StatefulWidget {
 class _NgoDashboardState extends State<NgoDashboard> {
   int _currentIndex = 0;
   late final List<Widget> _children;
+  StreamSubscription<QuerySnapshot>? _proofNotificationSubscription;
+  final Set<String> _shownNotificationIds = <String>{};
+  int _lastPendingProofCount = 0;
 
   @override
   void initState() {
@@ -26,6 +30,69 @@ class _NgoDashboardState extends State<NgoDashboard> {
       ReviewQueueScreen(ngoId: widget.ngoId),
       NgoImpactDashboardScreen(ngoId: widget.ngoId),
     ];
+    _listenForProofNotifications();
+  }
+
+  @override
+  void dispose() {
+    _proofNotificationSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _listenForProofNotifications() {
+    _proofNotificationSubscription = FirebaseFirestore.instance
+        .collection('ngo_notifications')
+        .where('ngoId', isEqualTo: widget.ngoId)
+        .where('type', isEqualTo: 'proof_submitted')
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted) return;
+
+          final docs = snapshot.docs;
+          final count = docs.length;
+          final hasNewNotification = docs.any(
+            (doc) => !_shownNotificationIds.contains(doc.id),
+          );
+
+          for (final doc in docs) {
+            _shownNotificationIds.add(doc.id);
+          }
+
+          if (count > 0 &&
+              hasNewNotification &&
+              count >= _lastPendingProofCount) {
+            _showPendingApprovalsBanner(count);
+          }
+
+          _lastPendingProofCount = count;
+        });
+  }
+
+  void _showPendingApprovalsBanner(int count) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentMaterialBanner();
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        content: Text(
+          count == 1
+              ? '1 task is waiting for proof approval.'
+              : '$count tasks are waiting for proof approval.',
+        ),
+        leading: const Icon(Icons.fact_check_outlined),
+        actions: [
+          TextButton(
+            onPressed: () => messenger.hideCurrentMaterialBanner(),
+            child: const Text('DISMISS'),
+          ),
+        ],
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+    });
   }
 
   @override
@@ -59,12 +126,18 @@ class _NgoDashboardState extends State<NgoDashboard> {
               NavigationDestination(
                 icon: Badge(
                   isLabelVisible: pendingCount > 0,
-                  label: Text('$pendingCount', style: const TextStyle(fontSize: 10)),
+                  label: Text(
+                    '$pendingCount',
+                    style: const TextStyle(fontSize: 10),
+                  ),
                   child: const Icon(Icons.rate_review_outlined),
                 ),
                 selectedIcon: Badge(
                   isLabelVisible: pendingCount > 0,
-                  label: Text('$pendingCount', style: const TextStyle(fontSize: 10)),
+                  label: Text(
+                    '$pendingCount',
+                    style: const TextStyle(fontSize: 10),
+                  ),
                   child: const Icon(Icons.rate_review_rounded),
                 ),
                 label: 'Review',

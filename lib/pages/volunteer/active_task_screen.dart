@@ -19,6 +19,7 @@ class ActiveTaskScreen extends StatefulWidget {
   final String ngoEmail;
   final String status;
   final Map<String, dynamic>? proof;
+  final String? adminReviewNote;
 
   const ActiveTaskScreen({
     super.key,
@@ -29,6 +30,7 @@ class ActiveTaskScreen extends StatefulWidget {
     required this.ngoEmail,
     this.status = 'accepted',
     this.proof,
+    this.adminReviewNote,
   });
 
   @override
@@ -78,6 +80,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
     
     final bool isCompleted = widget.status == 'proof_approved';
     final bool isSubmitted = widget.status == 'proof_submitted';
+    final bool isRejected = widget.status == 'proof_rejected';
     final bool isReadOnly = isCompleted || isSubmitted;
 
     return Scaffold(
@@ -104,28 +107,83 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
               child: Column(
                 children: [
                   Icon(
-                    isCompleted ? Icons.verified_rounded : (isSubmitted ? Icons.hourglass_top_rounded : Icons.run_circle_rounded), 
-                    size: 56, 
+                    isCompleted
+                        ? Icons.verified_rounded
+                        : (isSubmitted
+                              ? Icons.hourglass_top_rounded
+                              : (isRejected
+                                    ? Icons.refresh_rounded
+                                    : Icons.run_circle_rounded)),
+                    size: 56,
                     color: isCompleted ? Colors.white : cs.primary,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isCompleted ? 'Mission Completed' : (isSubmitted ? 'Awaiting Review' : 'Mission is active'), 
-                    style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white),
+                    isCompleted
+                        ? 'Mission Completed'
+                        : (isSubmitted
+                              ? 'Awaiting Review'
+                              : (isRejected
+                                    ? 'Proof needs revision'
+                                    : 'Mission is active')),
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    isCompleted 
-                      ? 'Thank you for your incredible service!' 
-                      : (isSubmitted ? 'We\'ll notify you once the NGO reviews it.' : 'Head to the location and complete the task.'), 
-                    textAlign: TextAlign.center, 
-                    style: GoogleFonts.inter(fontSize: 14, color: Colors.white.withValues(alpha: 0.7)),
+                    isCompleted
+                        ? 'Thank you for your incredible service!'
+                        : (isSubmitted
+                              ? 'We\'ll notify you once the NGO reviews it.'
+                              : (isRejected
+                                    ? 'Please review the NGO feedback and upload updated proof.'
+                                    : 'Head to the location and complete the task.')),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),
             ),
 
             const SizedBox(height: 28),
+
+            if (isRejected && (widget.adminReviewNote?.trim().isNotEmpty ?? false)) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: SahayaColors.coral.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: SahayaColors.coral.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'NGO Feedback',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: SahayaColors.coral,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.adminReviewNote!.trim(),
+                      style: GoogleFonts.inter(fontSize: 14, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             // ─── Proof Section ───
             if (isReadOnly && widget.proof != null) ...[

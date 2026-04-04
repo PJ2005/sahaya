@@ -44,6 +44,11 @@ class ExtractionService {
         ); // Natively encode nested geometric array mathematically
       }
 
+      // 2b. Plain text and copied-note payloads
+      if (upload.fileType == 'text' || uriList.contains('.txt')) {
+        return utf8.decode(bytes, allowMalformed: true);
+      }
+
       // 3. Excel Array Mapping
       if (uriList.contains('.xlsx') || uriList.contains('.xls')) {
         final excel = Excel.decodeBytes(bytes);

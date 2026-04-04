@@ -3,6 +3,7 @@ import os
 import requests
 import cloudinary
 import cloudinary.uploader
+import base64
 import firebase_admin
 from firebase_admin import credentials, firestore
 import uuid
@@ -146,7 +147,7 @@ def register_user(chat_id, ngo_id):
             'ngoId': ngo_id,
             'registeredAt': firestore.SERVER_TIMESTAMP
         })
-        send_telegram_message(chat_id, f"Success! You are now physically bound to NGO: {ngo_id}. Send photos or CSVs at any time to inject them directly to Cloudinary and Firestore!")
+        send_telegram_message(chat_id, f"Success! You are now physically bound to NGO: {ngo_id}. Send text, voice notes, photos, CSVs, or files at any time to inject them directly to Cloudinary and Firestore!")
     except Exception as e:
         send_telegram_message(chat_id, f"Database link failed! Error: {e}")
 
@@ -156,6 +157,43 @@ def get_linked_ngo(chat_id):
     if doc.exists:
         return doc.to_dict().get('ngoId')
     return None
+
+
+def create_text_upload(text_content, ngo_id):
+    """Stores pasted Telegram text as a raw upload that Gemini can process later."""
+    public_id = f"sahaya_text_{uuid.uuid4()}"
+    data_uri = (
+        "data:text/plain;base64,"
+        + base64.b64encode(text_content.encode('utf-8')).decode('utf-8')
+    )
+
+    if CLOUDINARY_UPLOAD_PRESET:
+        upload_result = cloudinary.uploader.unsigned_upload(
+            data_uri,
+            CLOUDINARY_UPLOAD_PRESET,
+            resource_type="raw",
+            public_id=public_id,
+            filename_override="survey_notes.txt",
+        )
+    else:
+        upload_result = cloudinary.uploader.upload(
+            data_uri,
+            resource_type="raw",
+            public_id=public_id,
+            filename_override="survey_notes.txt",
+        )
+
+    doc_id = str(uuid.uuid4())
+    db.collection('raw_uploads').document(doc_id).set({
+        'id': doc_id,
+        'ngoId': ngo_id,
+        'cloudinaryUrl': upload_result.get('secure_url'),
+        'cloudinaryPublicId': upload_result.get('public_id'),
+        'fileType': 'text',
+        'uploadedAt': firestore.SERVER_TIMESTAMP,
+        'status': 'pending'
+    })
+    return doc_id
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -191,6 +229,14 @@ def webhook():
         photo = message['photo'][-1]
         file_id = photo['file_id']
         file_type = 'image'
+    elif 'voice' in message:
+        voice = message['voice']
+        file_id = voice['file_id']
+        file_type = 'audio'
+    elif 'audio' in message:
+        audio = message['audio']
+        file_id = audio['file_id']
+        file_type = 'audio'
     elif 'document' in message:
         doc = message['document']
         file_id = doc['file_id']
@@ -199,13 +245,33 @@ def webhook():
             file_type = 'image'
         elif mime_type in ['text/csv', 'application/csv', 'application/vnd.ms-excel']:
             file_type = 'csv'
+        elif mime_type.startswith('audio/'):
+            file_type = 'audio'
+        elif mime_type == 'text/plain':
+            file_type = 'text'
         else:
             file_type = 'document'
             
     if not file_id:
-        # Ignore random texts if they are just chatting to the bot
-        if not text.startswith('/'):
-          send_telegram_message(chat_id, "I only process Photos or Data CSVs currently. Please attach a structural payload!")
+        if text and not text.startswith('/'):
+            try:
+                doc_id = create_text_upload(text, ngo_id)
+                send_telegram_message(
+                    chat_id,
+                    f"Text received and queued for Gemini processing.\nDatabase ID: {doc_id}",
+                )
+                return jsonify({
+                    'status': 'success',
+                    'docId': doc_id,
+                    'mode': 'inline_text',
+                }), 200
+            except Exception as e:
+                print(f"Inline text ingest failed: {e}")
+                send_telegram_message(
+                    chat_id,
+                    "I couldn't save that text for processing. Please try again.",
+                )
+                return jsonify({'status': 'error', 'reason': str(e)}), 500
         return jsonify({'status': 'ignored', 'reason': 'no attachments'}), 200
 
     # 4. Request internal File URI from Telegram servers
@@ -257,7 +323,7 @@ def webhook():
     try:
         db.collection('raw_uploads').document(doc_id).set(upload_doc)
         print(f"Logged ID: {doc_id} mapped natively to {ngo_id}")
-        send_telegram_message(chat_id, f"✅ Fully synchronized to Sahaya Cloud!\nDatabase ID: {doc_id}")
+        send_telegram_message(chat_id, f"Synced to Sahaya Cloud.\nDatabase ID: {doc_id}")
     except Exception as e:
         print(f"Firestore save rejected natively: {e}")
         send_telegram_message(chat_id, "Cloudinary upload succeeded, but Firestore registration crashed locally!")
@@ -445,6 +511,8 @@ def run_matching():
              
              # 3. Location filtering
              v_geo = v_data.get('locationGeoPoint')
+             window_active = bool(v_data.get('availabilityWindowActive', False))
+             is_partial = bool(v_data.get('isPartialAvailability', False))
              radius_km = float(v_data.get('radiusKm', 10.0))
              if not v_geo:
                  continue
@@ -458,12 +526,16 @@ def run_matching():
              
              v_skills = v_data.get('skillTags', [])
              overlap = len(set(v_skills).intersection(set(task_skills)))
+             availability_bonus = 0.05 if is_partial else (0.10 if window_active else 0.0)
              
-             score = (overlap / max(len(task_skills), 1)) * 0.6 + (1.0 - normalized_distance) * 0.4
+             score = (overlap / max(len(task_skills), 1)) * 0.55 + (1.0 - normalized_distance) * 0.35 + availability_bonus
              
              matches.append({
                  'volunteerId': v_doc.id,  # uid of the volunteer technically
-                 'score': score
+                 'score': score,
+                 'distanceKm': round(dist_km, 2),
+                 'skillOverlap': overlap,
+                 'availabilityBonus': availability_bonus
              })
 
         # 5. Write Top 20 Matches
@@ -492,6 +564,9 @@ def run_matching():
                  'taskId': task_id,
                  'volunteerId': m['volunteerId'],
                  'matchScore': m['score'],
+                 'distanceKm': m['distanceKm'],
+                 'skillOverlap': m['skillOverlap'],
+                 'availabilityBonus': m['availabilityBonus'],
                  'status': 'open',
                  'missionBriefing': task_data.get('description', 'Mission Briefing'),
                  'whatToBring': what_to_bring_text,

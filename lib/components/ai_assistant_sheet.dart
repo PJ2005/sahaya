@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/gemini_service.dart';
+import '../theme/sahaya_theme.dart';
 
 /// A reusable bottom sheet that lets the admin describe changes in natural language.
 /// The AI processes the request and returns modified data via [onResult].
 class AiAssistantSheet extends StatefulWidget {
   final Map<String, dynamic> currentData;
-  final String
-  contextDescription; // e.g. "a volunteer task" or "an extracted problem card"
+  final String contextDescription;
   final void Function(Map<String, dynamic> modifiedData) onResult;
 
   const AiAssistantSheet({
@@ -16,7 +16,6 @@ class AiAssistantSheet extends StatefulWidget {
     required this.onResult,
   });
 
-  /// Convenience method to open the sheet from anywhere.
   static void show(
     BuildContext context, {
     required Map<String, dynamic> currentData,
@@ -75,13 +74,25 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final surfaceColor = isDark ? SahayaColors.darkSurface : Colors.white;
+    final inputFill = isDark ? SahayaColors.darkBg : const Color(0xFFF8FAFC);
+    final successBg =
+        isDark ? const Color(0xFF0D2217) : const Color(0xFFF0FDF4);
+
+    final changedEntries = _preview?.entries.where((e) {
+      final original = widget.currentData[e.key];
+      return original?.toString() != e.value?.toString();
+    }).toList();
 
     return Container(
       margin: const EdgeInsets.only(top: 60),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
@@ -89,14 +100,13 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle bar
             Center(
               child: Container(
-                width: 40,
+                width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ),
@@ -104,21 +114,19 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
+                    color: cs.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    color: Colors.white,
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: cs.primary,
                     size: 18,
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -127,11 +135,15 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
+                          color: cs.onSurface,
                         ),
                       ),
                       Text(
                         'Describe what you want changed',
-                        style: TextStyle(fontSize: 11, color: Colors.black45),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -139,8 +151,6 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
               ],
             ),
             const SizedBox(height: 14),
-
-            // Input field
             Row(
               children: [
                 Expanded(
@@ -149,30 +159,30 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                     decoration: InputDecoration(
                       hintText:
                           'e.g. "Change severity to critical and update the description"',
-                      hintStyle: const TextStyle(
+                      hintStyle: TextStyle(
                         fontSize: 12,
-                        color: Colors.black26,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
+                      fillColor: inputFill,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 12,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: Colors.grey.shade200),
+                        borderSide: BorderSide(color: cs.outlineVariant),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: Colors.grey.shade200),
+                        borderSide: BorderSide(color: cs.outlineVariant),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                        borderSide: BorderSide(color: cs.primary, width: 1.5),
                       ),
                     ),
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13, color: cs.onSurface),
                     maxLines: 3,
                     minLines: 1,
                     textInputAction: TextInputAction.send,
@@ -181,7 +191,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                 ),
                 const SizedBox(width: 8),
                 Material(
-                  color: const Color(0xFF6366F1),
+                  color: cs.primary,
                   borderRadius: BorderRadius.circular(16),
                   child: InkWell(
                     onTap: _loading ? null : _submit,
@@ -207,99 +217,93 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                 ),
               ],
             ),
-
-            // Error
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(
                 'Error: $_error',
-                style: const TextStyle(fontSize: 11, color: Colors.red),
+                style: TextStyle(fontSize: 11, color: cs.error),
               ),
             ],
-
-            // Preview
             if (_preview != null) ...[
               const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: successBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  border: Border.all(
+                    color: SahayaColors.emerald.withValues(alpha: 0.35),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        Icon(
+                          Icons.check_circle,
+                          color: SahayaColors.emerald,
+                          size: 16,
+                        ),
                         SizedBox(width: 6),
                         Text(
                           'AI Suggestion Preview',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
-                            color: Colors.green,
+                            color: SahayaColors.emerald,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ..._preview!.entries
-                        .where((e) {
-                          // Only show fields that changed
-                          final original = widget.currentData[e.key];
-                          return original?.toString() != e.value?.toString();
-                        })
-                        .map(
-                          (e) => Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: RichText(
-                              text: TextSpan(
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black87,
-                                ),
-                                children: [
-                                  TextSpan(
-                                    text: '${e.key}: ',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: '${widget.currentData[e.key]}',
-                                    style: const TextStyle(
-                                      decoration: TextDecoration.lineThrough,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                  const TextSpan(text: ' → '),
-                                  TextSpan(
-                                    text: '${e.value}',
-                                    style: const TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                    if (_preview!.entries
-                        .where(
-                          (e) =>
-                              widget.currentData[e.key]?.toString() !=
-                              e.value?.toString(),
-                        )
-                        .isEmpty)
-                      const Text(
+                    if (changedEntries == null || changedEntries.isEmpty)
+                      Text(
                         'No changes detected.',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.black38,
+                          color: cs.onSurfaceVariant,
                           fontStyle: FontStyle.italic,
+                        ),
+                      )
+                    else
+                      ...changedEntries.map(
+                        (e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: RichText(
+                            text: TextSpan(
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurface,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: '${e.key}: ',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: '${widget.currentData[e.key]}',
+                                  style: TextStyle(
+                                    decoration: TextDecoration.lineThrough,
+                                    color: cs.error,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' -> ',
+                                  style: TextStyle(color: cs.onSurfaceVariant),
+                                ),
+                                TextSpan(
+                                  text: '${e.value}',
+                                  style: const TextStyle(
+                                    color: SahayaColors.emerald,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     const SizedBox(height: 10),
@@ -308,9 +312,12 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                       children: [
                         TextButton(
                           onPressed: () => setState(() => _preview = null),
-                          child: const Text(
+                          child: Text(
                             'Discard',
-                            style: TextStyle(color: Colors.red, fontSize: 12),
+                            style: TextStyle(
+                              color: cs.error,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -328,7 +335,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: SahayaColors.emerald,
                             foregroundColor: Colors.white,
                           ),
                         ),
