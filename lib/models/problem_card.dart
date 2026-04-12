@@ -27,6 +27,7 @@ abstract class ProblemCard with _$ProblemCard {
     required String id,
     required String ngoId,
     required IssueType issueType,
+    String? customIssueType,
     required String locationWard,
     required String locationCity,
     @GeoPointConverter() required GeoPoint locationGeoPoint,

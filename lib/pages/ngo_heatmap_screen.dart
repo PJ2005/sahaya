@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/sahaya_theme.dart';
+import '../models/problem_card.dart';
 
 class NgoHeatmapScreen extends StatefulWidget {
   final String ngoId;
@@ -16,6 +17,7 @@ class NgoHeatmapScreen extends StatefulWidget {
 class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
   final MapController _mapController = MapController();
   List<CircleMarker> _heatmapCircles = [];
+  List<Marker> _interactiveMarkers = [];
   bool _isLoading = true;
 
   @override
@@ -33,6 +35,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
           .get();
 
       List<CircleMarker> circles = [];
+      List<Marker> markers = [];
       
       for (var doc in snapshot.docs) {
         final data = doc.data();
@@ -42,14 +45,33 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
           double radius = _getRadiusFromCount(data['affectedCount']);
           Color color = _getColorFromSeverity(data['severityLevel']);
           
+          final point = LatLng(gp.latitude, gp.longitude);
+          
           circles.add(
             CircleMarker(
-              point: LatLng(gp.latitude, gp.longitude),
+              point: point,
               color: color.withValues(alpha: 0.35),
               borderColor: color.withValues(alpha: 0.6),
               borderStrokeWidth: 2,
               useRadiusInMeter: true,
               radius: radius, 
+            )
+          );
+          
+          markers.add(
+            Marker(
+              point: point,
+              width: 80,
+              height: 80,
+              child: GestureDetector(
+                onTap: () => _showProblemDetails(context, data),
+                child: Container(
+                  color: Colors.transparent, // Invisible interactive zone
+                  child: Center(
+                    child: Icon(Icons.location_on_rounded, color: color, size: 24),
+                  ),
+                ),
+              ),
             )
           );
         }
@@ -58,6 +80,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
       if (mounted) {
         setState(() {
           _heatmapCircles = circles;
+          _interactiveMarkers = markers;
           _isLoading = false;
         });
         
@@ -92,6 +115,77 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
     }
   }
 
+  void _showProblemDetails(BuildContext context, Map<String, dynamic> data) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final classification = (data['issueType']?.toString().toUpperCase() ?? 'OTHER');
+    final customClass = data['customIssueType']?.toString();
+    final displayName = classification == 'OTHER' && customClass != null 
+        ? '$classification ($customClass)' 
+        : classification;
+        
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? SahayaColors.darkSurface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(displayName, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: cs.primary)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: _getColorFromSeverity(data['severityLevel']).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                    child: Text(
+                      (data['severityLevel']?.toString().toUpperCase() ?? 'MEDIUM'),
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: _getColorFromSeverity(data['severityLevel'])),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                data['description']?.toString() ?? 'No description provided.',
+                style: GoogleFonts.inter(fontSize: 16, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.people_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text('Est. Affected: ${data['affectedCount'] ?? 0}', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.location_on_outlined, size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text('${data['locationWard'] ?? 'Unknown Ward'}, ${data['locationCity'] ?? 'Unknown City'}', 
+                    style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
+                ],
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -116,6 +210,9 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
               ),
               CircleLayer(
                 circles: _heatmapCircles,
+              ),
+              MarkerLayer(
+                markers: _interactiveMarkers,
               ),
             ],
           ),

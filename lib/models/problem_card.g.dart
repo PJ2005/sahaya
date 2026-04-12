@@ -10,6 +10,7 @@ _ProblemCard _$ProblemCardFromJson(Map<String, dynamic> json) => _ProblemCard(
   id: json['id'] as String,
   ngoId: json['ngoId'] as String,
   issueType: $enumDecode(_$IssueTypeEnumMap, json['issueType']),
+  customIssueType: json['customIssueType'] as String?,
   locationWard: json['locationWard'] as String,
   locationCity: json['locationCity'] as String,
   locationGeoPoint: const GeoPointConverter().fromJson(
@@ -36,6 +37,7 @@ Map<String, dynamic> _$ProblemCardToJson(_ProblemCard instance) =>
       'id': instance.id,
       'ngoId': instance.ngoId,
       'issueType': _$IssueTypeEnumMap[instance.issueType]!,
+      'customIssueType': instance.customIssueType,
       'locationWard': instance.locationWard,
       'locationCity': instance.locationCity,
       'locationGeoPoint': const GeoPointConverter().toJson(

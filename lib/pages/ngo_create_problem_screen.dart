@@ -39,6 +39,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
   final _cityCtrl = TextEditingController();
   final _affectedCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _customCategoryCtrl = TextEditingController();
   bool _manualProcessing = false;
 
   @override
@@ -57,6 +58,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
     _cityCtrl.dispose();
     _affectedCtrl.dispose();
     _descCtrl.dispose();
+    _customCategoryCtrl.dispose();
     super.dispose();
   }
 
@@ -146,6 +148,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
         id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
         ngoId: widget.ngoId,
         issueType: _issueType,
+        customIssueType: _issueType == IssueType.other ? _customCategoryCtrl.text.trim() : null,
         locationWard: ward,
         locationCity: city,
         locationGeoPoint: geo,
@@ -329,6 +332,18 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
               items: IssueType.values.map((v) => DropdownMenuItem(value: v, child: Text(v.name.toUpperCase()))).toList(),
               onChanged: (v) => setState(() => _issueType = v!),
             ),
+            if (_issueType == IssueType.other) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _customCategoryCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Custom Category', 
+                  hintText: 'e.g., Toxic Waste, Pothole',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (v) => v!.trim().isEmpty ? 'Please specify custom category' : null,
+              ),
+            ],
             const SizedBox(height: 16),
             DropdownButtonFormField<SeverityLevel>(
               value: _severityLevel,

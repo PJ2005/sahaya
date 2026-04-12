@@ -55,6 +55,7 @@ class NgoHomeScreen extends StatelessWidget {
       id: doc.id,
       ngoId: (data['ngoId'] as String?) ?? ngoId,
       issueType: issueType,
+      customIssueType: data['customIssueType'] as String?,
       locationWard: (data['locationWard'] as String?) ?? 'Unknown Ward',
       locationCity: (data['locationCity'] as String?) ?? 'Unknown City',
       locationGeoPoint: geoPoint,
