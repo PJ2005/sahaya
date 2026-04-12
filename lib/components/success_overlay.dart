@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/translator.dart';
+
 
 class SuccessOverlay extends StatefulWidget {
   final String message;
@@ -86,7 +88,7 @@ class _SuccessOverlayDialogState extends State<_SuccessOverlayDialog> {
                   size: 80,
                 ),
                 const SizedBox(height: 24),
-                Text(
+                T(
                   widget.message,
                   textAlign: TextAlign.center,
                   style: const TextStyle(

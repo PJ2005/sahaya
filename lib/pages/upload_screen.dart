@@ -75,14 +75,14 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File uploaded successfully!'), backgroundColor: SahayaColors.emerald),
+            const SnackBar(content: T('File uploaded successfully!'), backgroundColor: SahayaColors.emerald),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'), backgroundColor: SahayaColors.coral),
+          SnackBar(content: T('Upload failed: $e'), backgroundColor: SahayaColors.coral),
         );
       }
     } finally {
@@ -95,7 +95,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Paste or type some field notes first.'),
+          content: T('Paste or type some field notes first.'),
           backgroundColor: SahayaColors.coral,
         ),
       );
@@ -115,7 +115,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Text notes uploaded successfully!'),
+            content: T('Text notes uploaded successfully!'),
             backgroundColor: SahayaColors.emerald,
           ),
         );
@@ -124,7 +124,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Text upload failed: $e'),
+            content: T('Text upload failed: $e'),
             backgroundColor: SahayaColors.coral,
           ),
         );
@@ -306,7 +306,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   children: [
                     Icon(Icons.notes_rounded, color: cs.primary),
                     const SizedBox(width: 10),
-                    Text(
+                    T(
                       'Paste field notes directly',
                       style: GoogleFonts.inter(
                         fontSize: 16,
@@ -388,11 +388,11 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   children: [
                     const Icon(Icons.telegram, color: Color(0xFF0088cc), size: 28),
                     const SizedBox(width: 12),
-                    Text('Telegram Assistant', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
+                    T('Telegram Assistant', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
                   ],
                 ),
                 const SizedBox(height: 24),
-                Text('YOUR REGISTRATION COMMAND', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
+                T('YOUR REGISTRATION COMMAND', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -404,12 +404,12 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(registerCmd, style: GoogleFonts.firaCode(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF0088cc))),
+                        child: T(registerCmd, style: GoogleFonts.firaCode(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF0088cc))),
                       ),
                       IconButton(
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: registerCmd));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Command copied to clipboard!')));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Command copied to clipboard!')));
                         },
                         icon: const Icon(Icons.copy_rounded, size: 20, color: Color(0xFF0088cc)),
                         padding: EdgeInsets.zero,
@@ -419,7 +419,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text('CONNECTION STEPS', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
+                T('CONNECTION STEPS', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.5)),
                 const SizedBox(height: 12),
                 _stepRow(context, '1', 'Install Telegram on your mobile device.'),
                 _stepRow(context, '2', 'Find @Sahaya_Helper_bot in search.'),
@@ -439,9 +439,9 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$num.', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, color: const Color(0xFF0088cc))),
+          T('$num.', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, color: const Color(0xFF0088cc))),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurface, height: 1.3))),
+          Expanded(child: T(text, style: GoogleFonts.inter(fontSize: 13, color: Theme.of(context).colorScheme.onSurface, height: 1.3))),
         ],
       ),
     );
@@ -464,7 +464,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
               children: [
                 Icon(Icons.sync_disabled_rounded, size: 32, color: cs.outlineVariant),
                 const SizedBox(height: 8),
-                Text('No recent syncs', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+                T('No recent syncs', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
               ],
             ),
           );
@@ -512,9 +512,9 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${raw.fileType.toUpperCase()} PAYLOAD', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                        T('${raw.fileType.toUpperCase()} PAYLOAD', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                         const SizedBox(height: 2),
-                        Text(_fmtTime(raw.uploadedAt), style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
+                        T(_fmtTime(raw.uploadedAt), style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
                       ],
                     ),
                   ),
@@ -583,7 +583,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     }, SetOptions(merge: true));
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Extraction failed. Review in queue.'), backgroundColor: SahayaColors.coral));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Extraction failed. Review in queue.'), backgroundColor: SahayaColors.coral));
     }
   }
 
@@ -598,7 +598,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(text, style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.w900, color: fg)),
+      child: T(text, style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.w900, color: fg)),
     );
   }
 }

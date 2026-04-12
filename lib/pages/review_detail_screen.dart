@@ -8,6 +8,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../theme/sahaya_theme.dart';
+import '../utils/translator.dart';
+
 
 class ReviewDetailScreen extends StatefulWidget {
   final RawUpload? upload;
@@ -69,7 +71,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Building Action Plan & Connecting Volunteers...'), duration: Duration(seconds: 2)),
+          const SnackBar(content: T('Building Action Plan & Connecting Volunteers...'), duration: Duration(seconds: 2)),
         );
       }
 
@@ -105,7 +107,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: T(
           'Review Extraction',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
@@ -167,7 +169,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                   ),
                   elevation: 0,
                 ),
-                child: Text(
+                child: T(
                   _saving ? 'Processing...' : 'Approve & Create Problem Card',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w800,
@@ -180,7 +182,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             Center(
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(
+                child: T(
                   'Discard Extraction',
                   style: TextStyle(
                     color: SahayaColors.coral,
@@ -209,7 +211,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           children: [
             Icon(Icons.mic_none_rounded, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 8),
-            Text('No Media (Direct Entry)', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+            T('No Media (Direct Entry)', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
           ],
         ),
       );
@@ -241,7 +243,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  T(
                     'Video Evidence',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                   ),
@@ -267,7 +269,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             children: [
               Icon(icon, size: 14, color: cs.primary),
               const SizedBox(width: 8),
-              Text(
+              T(
                 label.toUpperCase(),
                 style: GoogleFonts.inter(
                   fontSize: 11,

@@ -7,6 +7,8 @@ import 'ngo_home_screen.dart';
 import 'ngo_impact_dashboard_screen.dart';
 import 'ngo_heatmap_screen.dart';
 import 'proof_review_screen.dart';
+import '../utils/translator.dart';
+
 
 class NgoDashboard extends StatefulWidget {
   final String ngoId;
@@ -85,7 +87,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
     
     messenger.showSnackBar(
       SnackBar(
-        content: Text(
+        content: T(
           count == 1
               ? '1 task is waiting for proof approval.'
               : '$count tasks are waiting for proof approval.',
@@ -141,7 +143,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
               NavigationDestination(
                 icon: Badge(
                   isLabelVisible: pendingCount > 0,
-                  label: Text(
+                  label: T(
                     '$pendingCount',
                     style: const TextStyle(fontSize: 10),
                   ),
@@ -149,7 +151,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
                 ),
                 selectedIcon: Badge(
                   isLabelVisible: pendingCount > 0,
-                  label: Text(
+                  label: T(
                     '$pendingCount',
                     style: const TextStyle(fontSize: 10),
                   ),

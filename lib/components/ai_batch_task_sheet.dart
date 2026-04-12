@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/gemini_service.dart';
+import '../utils/translator.dart';
+
 
 /// A bottom sheet that sends ALL tasks for a problem card to Gemini
 /// and applies batch modifications (add, remove, merge, edit).
@@ -116,7 +118,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
+            content: T(
               '${_preview!.length} tasks applied. ${existingIds.length - keptIds.length} removed.',
             ),
             backgroundColor: Colors.green,
@@ -181,14 +183,14 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        const T(
                           'AI Task Refactor',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
                           ),
                         ),
-                        Text(
+                        T(
                           '$originalCount tasks loaded — describe changes for all',
                           style: const TextStyle(
                             fontSize: 11,
@@ -274,7 +276,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
 
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(
+                T(
                   'Error: $_error',
                   style: const TextStyle(fontSize: 11, color: Colors.red),
                 ),
@@ -301,7 +303,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                             size: 16,
                           ),
                           const SizedBox(width: 6),
-                          Text(
+                          T(
                             'Result: ${_preview!.length} tasks (was $originalCount)',
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
@@ -328,7 +330,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              T(
                                 '${idx + 1}. ',
                                 style: const TextStyle(
                                   fontSize: 12,
@@ -346,7 +348,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                                     color: Colors.green.withOpacity(0.15),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: const Text(
+                                  child: const T(
                                     'NEW',
                                     style: TextStyle(
                                       fontSize: 8,
@@ -356,7 +358,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                                   ),
                                 ),
                               Expanded(
-                                child: Text(
+                                child: T(
                                   '${type.toUpperCase()} — $desc',
                                   style: const TextStyle(
                                     fontSize: 11,
@@ -376,7 +378,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                         children: [
                           TextButton(
                             onPressed: () => setState(() => _preview = null),
-                            child: const Text(
+                            child: const T(
                               'Discard',
                               style: TextStyle(color: Colors.red, fontSize: 12),
                             ),
@@ -385,7 +387,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                           ElevatedButton.icon(
                             onPressed: _loading ? null : _applyChanges,
                             icon: const Icon(Icons.check, size: 16),
-                            label: const Text(
+                            label: const T(
                               'Apply All Changes',
                               style: TextStyle(
                                 fontSize: 12,

@@ -6,6 +6,8 @@ import '../components/ai_assistant_sheet.dart';
 import '../components/ai_batch_task_sheet.dart';
 import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
+import '../utils/translator.dart';
+
 
 class NgoTaskDetailScreen extends StatefulWidget {
   final ProblemCard card;
@@ -23,7 +25,7 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Task Details', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        title: T('Task Details', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -41,10 +43,10 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Situation Overview', 
+                  T('Situation Overview', 
                     style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: cs.primary)),
                   const SizedBox(height: 12),
-                  Text(card.description, 
+                  T(card.description, 
                     style: GoogleFonts.inter(fontSize: 15, height: 1.6, color: cs.onSurface.withValues(alpha: 0.8))),
                 ],
               ),
@@ -61,7 +63,7 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEditor(context),
-        label: const Text('Add Volunteer Task'),
+        label: const T('Add Volunteer Task'),
         icon: const Icon(Icons.add),
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
@@ -87,14 +89,14 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
             children: [
               _severityPill(context, card.severityLevel),
               const Spacer(),
-              Text(
+              T(
                 'Priority Score: ${card.priorityScore.toStringAsFixed(1)}',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: cs.primary, fontSize: 13),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Text(
+          T(
             card.issueType.name.replaceAll('_', ' ').toUpperCase(),
             style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -1),
           ),
@@ -103,7 +105,7 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
             children: [
               Icon(Icons.location_on_rounded, size: 16, color: cs.primary),
               const SizedBox(width: 6),
-              Text(
+              T(
                 '${card.locationWard}, ${card.locationCity}',
                 style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500),
               ),
@@ -145,8 +147,8 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
           children: [
             Icon(icon, size: 18, color: cs.primary.withValues(alpha: 0.7)),
             const SizedBox(height: 6),
-            Text(value, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
-            Text(label, style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
+            T(value, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
+            T(label, style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
           ],
         ),
       ),
@@ -173,7 +175,7 @@ class _NgoTaskDetailScreenState extends State<NgoTaskDetailScreen> {
         children: [
           Icon(Icons.warning_amber_rounded, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
+          T(
             level.name.toUpperCase(),
             style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.5),
           ),
@@ -223,14 +225,14 @@ class _TasksList extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
               child: Row(
                 children: [
-                  Text('VOLUNTEER MISSIONS', 
+                  T('VOLUNTEER MISSIONS', 
                     style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: cs.onSurfaceVariant, letterSpacing: 1)),
                   const Spacer(),
                   if (tasks.isNotEmpty)
                     TextButton.icon(
                       onPressed: () => AiBatchTaskSheet.show(context, problemCardId: problemCardId, taskDocs: tasks),
                       icon: const Icon(Icons.auto_awesome, size: 14),
-                      label: const Text('AI Refactor', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      label: const T('AI Refactor', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                       style: TextButton.styleFrom(foregroundColor: const Color(0xFF6366F1), padding: const EdgeInsets.symmetric(horizontal: 6)),
                     ),
                 ],
@@ -244,7 +246,7 @@ class _TasksList extends StatelessWidget {
                     children: [
                       Icon(Icons.assignment_outlined, size: 48, color: cs.outlineVariant),
                       const SizedBox(height: 12),
-                      Text('No tasks defined yet', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
+                      T('No tasks defined yet', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -290,24 +292,24 @@ class _TaskItem extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(taskType.toUpperCase(),
+                child: T(taskType.toUpperCase(),
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: cs.primary)),
               ),
               _pill(context, task['status']?.toString().toUpperCase() ?? 'OPEN', statusColor.withValues(alpha: 0.1), statusColor),
             ],
           ),
           const SizedBox(height: 10),
-          Text(task['description'] ?? '', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
+          T(task['description'] ?? '', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 12),
           Row(
             children: [
               ...skills.take(3).map((s) => _skillPill(context, s)),
               if (skills.length > 3) 
-                Text(' +${skills.length - 3}', style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
+                T(' +${skills.length - 3}', style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
               const Spacer(),
               Icon(Icons.person_outline, size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 4),
-              Text('${task['estimatedVolunteers'] ?? 1}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+              T('${task['estimatedVolunteers'] ?? 1}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 12),
@@ -342,7 +344,7 @@ class _TaskItem extends StatelessWidget {
       margin: const EdgeInsets.only(right: 6),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: cs.outlineVariant.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-      child: Text(text, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600)),
+      child: T(text, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600)),
     );
   }
 
@@ -350,7 +352,7 @@ class _TaskItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(text, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: fg)),
+      child: T(text, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: fg)),
     );
   }
 
@@ -368,7 +370,7 @@ class _TaskItem extends StatelessWidget {
           children: [
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
-            Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+            T(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
           ],
         ),
       ),
@@ -379,11 +381,11 @@ class _TaskItem extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Task'),
-        content: const Text('This action cannot be undone.'),
+        title: const T('Delete Task'),
+        content: const T('This action cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const T('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const T('Delete', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -464,13 +466,13 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existingTask == null ? 'Create Mission' : 'Edit Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+      title: T(widget.existingTask == null ? 'Create Mission' : 'Edit Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
       content: SingleChildScrollView(
         child: Column(
           children: [
             DropdownButtonFormField<String>(
               value: _defaultTaskTypes.contains(_taskType) ? _taskType : 'other',
-              items: _defaultTaskTypes.map((s) => DropdownMenuItem(value: s, child: Text(s.replaceAll('_', ' ')))).toList(),
+              items: _defaultTaskTypes.map((s) => DropdownMenuItem(value: s, child: T(s.replaceAll('_', ' ')))).toList(),
               onChanged: (v) => setState(() => _taskType = v!),
               decoration: const InputDecoration(labelText: 'Task Type'),
             ),
@@ -485,12 +487,12 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            Align(alignment: Alignment.centerLeft, child: Text('Required Skills', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13))),
+            Align(alignment: Alignment.centerLeft, child: T('Required Skills', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13))),
             const SizedBox(height: 8),
             Wrap(
               spacing: 4,
               children: _defaultSkills.map((s) => FilterChip(
-                label: Text(s.replaceAll('_', ' '), style: const TextStyle(fontSize: 10)),
+                label: T(s.replaceAll('_', ' '), style: const TextStyle(fontSize: 10)),
                 selected: _selectedSkills.contains(s),
                 onSelected: (v) => setState(() => v ? _selectedSkills.add(s) : _selectedSkills.remove(s)),
               )).toList(),
@@ -506,8 +508,8 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving...' : 'Save')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const T('Cancel')),
+        ElevatedButton(onPressed: _saving ? null : _save, child: T(_saving ? 'Saving...' : 'Save')),
       ],
     );
   }

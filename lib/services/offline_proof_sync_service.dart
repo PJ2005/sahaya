@@ -49,6 +49,9 @@ class OfflineProofSyncService {
       },
       'status': 'proof_submitted',
       'updatedAt': FieldValue.serverTimestamp(),
+      'aiVerificationLabel': FieldValue.delete(),
+      'aiVerificationReason': FieldValue.delete(),
+      'aiVerifiedAt': FieldValue.delete(),
     });
   }
 
@@ -109,6 +112,9 @@ class OfflineProofSyncService {
       },
       'status': 'proof_submitted',
       'updatedAt': FieldValue.serverTimestamp(),
+      'aiVerificationLabel': FieldValue.delete(),
+      'aiVerificationReason': FieldValue.delete(),
+      'aiVerifiedAt': FieldValue.delete(),
     });
 
     await http

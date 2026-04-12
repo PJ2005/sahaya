@@ -1193,6 +1193,7 @@ def notify_proof_submitted():
 
         is_auto_approved = False
         ai_reason = "No photos for AI analysis"
+        confidence = 0
 
         if proof_photos and genai_client:
             prompt = f'''
@@ -1225,11 +1226,19 @@ Return ONLY valid JSON:
                 except Exception as e:
                     ai_reason = f"AI Error: {e}"
 
+        label = 'approved' if is_auto_approved else 'needs_clarification'
+        ai_verification_reason = f"[AUTO-APPROVED {confidence}%] {ai_reason}" if is_auto_approved else f"[MANUAL REVIEW REQUIRED {confidence}%] {ai_reason}"
+
+        db.collection('match_records').document(match_record_id).update({
+            'aiVerificationReason': ai_verification_reason,
+            'aiVerificationLabel': label,
+            'aiVerifiedAt': firestore.SERVER_TIMESTAMP,
+        })
+
         if is_auto_approved:
             # Auto Approve Data Changes
             db.collection('match_records').document(match_record_id).update({
                 'status': 'proof_approved',
-                'aiVerificationReason': f"[AUTO-APPROVED {confidence}%] {ai_reason}",
             })
             
             # Trust & Gamification Increment

@@ -13,6 +13,8 @@ import 'theme/sahaya_theme.dart';
 import 'theme/theme_provider.dart';
 import 'theme/locale_provider.dart';
 import 'l10n/app_text.dart';
+import 'utils/translator.dart';
+
 
 // Global theme provider so any screen can toggle dark mode
 final themeProvider = ThemeProvider();
@@ -59,7 +61,7 @@ class _AuthGatewayState extends State<AuthGateway> {
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Authentication failed')),
+          SnackBar(content: T(e.message ?? 'Authentication failed')),
         );
       }
     } finally {
@@ -111,7 +113,7 @@ class _AuthGatewayState extends State<AuthGateway> {
                       child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 36),
                     ),
                     const SizedBox(height: 28),
-                    Text(
+                    T(
                       'Welcome to\nSahaya',
                       style: GoogleFonts.inter(
                         fontSize: 32,
@@ -122,7 +124,7 @@ class _AuthGatewayState extends State<AuthGateway> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
+                    T(
                       'Community impact starts here.',
                       style: GoogleFonts.inter(
                         fontSize: 16,
@@ -167,7 +169,7 @@ class _AuthGatewayState extends State<AuthGateway> {
                                 height: 56,
                                 child: ElevatedButton(
                                   onPressed: () => _authenticate(true),
-                                  child: const Text('Sign In'),
+                                  child: const T('Sign In'),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -175,7 +177,7 @@ class _AuthGatewayState extends State<AuthGateway> {
                                 height: 56,
                                 child: OutlinedButton(
                                   onPressed: () => _authenticate(false),
-                                  child: const Text('Create Account'),
+                                  child: const T('Create Account'),
                                 ),
                               ),
                             ],

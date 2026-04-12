@@ -7,6 +7,8 @@ import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
 import 'review_detail_screen.dart';
 import 'manual_entry_form.dart';
+import '../utils/translator.dart';
+
 
 class ReviewQueueScreen extends StatelessWidget {
   final String ngoId;
@@ -16,7 +18,7 @@ class ReviewQueueScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Review Queue', 
+        title: T('Review Queue', 
           style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -1)),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -58,9 +60,9 @@ class ReviewQueueScreen extends StatelessWidget {
         children: [
           Icon(Icons.done_all_rounded, size: 64, color: SahayaColors.emerald.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
-          Text('Nothing to review!', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18)),
+          T('Nothing to review!', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18)),
           const SizedBox(height: 8),
-          Text('All reports have been processed.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          T('All reports have been processed.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 20),
           _assistantPrompt(context),
         ],
@@ -121,12 +123,12 @@ class ReviewQueueScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                T(
                   'Try the AI assistant — describe any change in plain English.',
                   style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                T(
                   'Open a review item, then ask for edits like priority, wording, or field corrections.',
                   style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
@@ -136,12 +138,12 @@ class ReviewQueueScreen extends StatelessWidget {
           TextButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
+                content: T(
                   'Open any queued report and tap AI Assistant to describe the change you want.',
                 ),
               ),
             ),
-            child: const Text('Try'),
+            child: const T('Try'),
           ),
         ],
       ),
@@ -186,12 +188,12 @@ class _ReviewBlock extends StatelessWidget {
                 _miniPill(context, 'PENDING REVIEW', borderColor.withValues(alpha: 0.1), borderColor),
                 const Spacer(),
                 if (card.status != ProblemStatus.extraction_failed)
-                  Text('${(card.confidenceScore * 100).toInt()}% CONFIDENCE', 
+                  T('${(card.confidenceScore * 100).toInt()}% CONFIDENCE', 
                     style: GoogleFonts.inter(fontWeight: FontWeight.w900, color: borderColor, fontSize: 10, letterSpacing: 0.5)),
               ],
             ),
             const SizedBox(height: 14),
-            Text(card.description, 
+            T(card.description, 
               style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3), 
               maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 12),
@@ -199,11 +201,11 @@ class _ReviewBlock extends StatelessWidget {
               children: [
                 Icon(Icons.location_on_outlined, size: 14, color: cs.onSurfaceVariant),
                 const SizedBox(width: 4),
-                Expanded(child: Text('${card.locationWard}, ${card.locationCity}', 
+                Expanded(child: T('${card.locationWard}, ${card.locationCity}', 
                   style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500))),
                 Icon(Icons.auto_awesome_outlined, size: 14, color: cs.primary),
                 const SizedBox(width: 4),
-                Text('AI DRAFT', style: GoogleFonts.inter(fontSize: 10, color: cs.primary, fontWeight: FontWeight.w800)),
+                T('AI DRAFT', style: GoogleFonts.inter(fontSize: 10, color: cs.primary, fontWeight: FontWeight.w800)),
               ],
             ),
           ],
@@ -219,7 +221,7 @@ class _ReviewBlock extends StatelessWidget {
       if (upload == null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cannot recover: Raw evidence completely missing.')),
+            const SnackBar(content: T('Cannot recover: Raw evidence completely missing.')),
           );
         }
         return;
@@ -290,7 +292,7 @@ class _ReviewBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(text, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
+      child: T(text, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
     );
   }
 }

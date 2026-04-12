@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/problem_card.dart';
 import 'ai_assistant_sheet.dart';
+import '../utils/translator.dart';
+
 
 class ReviewCardDialog extends StatefulWidget {
   final ProblemCard draftCard;
@@ -83,7 +85,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(
+                  content: T(
                     'Approved! $taskCount tasks generated. Priority: ${body['priorityScore']}',
                   ),
                   backgroundColor: Colors.green,
@@ -99,7 +101,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
       if (!taskGenSuccess && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Processing in background — check back shortly'),
+            content: T('Processing in background — check back shortly'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),
@@ -114,7 +116,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
         setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Approval failed: $e'),
+            content: T('Approval failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -134,7 +136,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Tasks are now ready! Check the Dashboard.'),
+              content: T('Tasks are now ready! Check the Dashboard.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -163,7 +165,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
+            content: T(
               'LLM Structuring successfully discarded! Data physically wiped.',
             ),
             backgroundColor: Colors.orange,
@@ -184,7 +186,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
       ringColor = Colors.orange;
 
     return AlertDialog(
-      title: const Text(
+      title: const T(
         'Execute Final Human Review',
         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
       ),
@@ -207,7 +209,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                     Icon(Icons.warning_amber_rounded, color: Colors.orange),
                     SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: T(
                         'Low confidence — please review carefully before approving.',
                         style: TextStyle(
                           color: Colors.brown,
@@ -235,7 +237,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                         strokeWidth: 5,
                       ),
                     ),
-                    Text(
+                    T(
                       '${(widget.draftCard.confidenceScore * 100).toInt()}%',
                       style: const TextStyle(
                         fontSize: 12,
@@ -246,7 +248,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                 ),
                 const SizedBox(width: 16),
                 const Expanded(
-                  child: Text(
+                  child: T(
                     'AI Structural Confidence',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                   ),
@@ -264,7 +266,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                   .map(
                     (v) => DropdownMenuItem(
                       value: v,
-                      child: Text(v.name.toUpperCase()),
+                      child: T(v.name.toUpperCase()),
                     ),
                   )
                   .toList(),
@@ -279,7 +281,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                   .map(
                     (v) => DropdownMenuItem(
                       value: v,
-                      child: Text(v.name.toUpperCase()),
+                      child: T(v.name.toUpperCase()),
                     ),
                   )
                   .toList(),
@@ -380,7 +382,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
         ),
         TextButton(
           onPressed: _isProcessing ? null : _discard,
-          child: const Text(
+          child: const T(
             'Discard',
             style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
           ),
@@ -400,7 +402,7 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Text(
+              : const T(
                   'Approve',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),

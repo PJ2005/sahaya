@@ -4,6 +4,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/sahaya_theme.dart';
+import '../utils/translator.dart';
+
 
 class NgoHeatmapScreen extends StatefulWidget {
   final String ngoId;
@@ -18,6 +20,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
   List<CircleMarker> _heatmapCircles = [];
   List<Marker> _interactiveMarkers = [];
   bool _isLoading = true;
+  LatLng _initialCenter = const LatLng(13.0827, 80.2707);
 
   @override
   void initState() {
@@ -80,17 +83,11 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
         setState(() {
           _heatmapCircles = circles;
           _interactiveMarkers = markers;
+          if (circles.isNotEmpty) {
+            _initialCenter = circles.first.point;
+          }
           _isLoading = false;
         });
-        
-        if (circles.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              final first = circles.first.point;
-              _mapController.move(first, 12);
-            }
-          });
-        }
       }
     } catch (e) {
       debugPrint('Error loading heatmap: $e');
@@ -148,11 +145,11 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(displayName, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: cs.primary)),
+                  T(displayName, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: cs.primary)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: _getColorFromSeverity(data['severityLevel']).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                    child: Text(
+                    child: T(
                       (data['severityLevel']?.toString().toUpperCase() ?? 'MEDIUM'),
                       style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: _getColorFromSeverity(data['severityLevel'])),
                     ),
@@ -160,7 +157,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
+              T(
                 data['description']?.toString() ?? 'No description provided.',
                 style: GoogleFonts.inter(fontSize: 16, height: 1.5),
               ),
@@ -169,7 +166,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
                 children: [
                   Icon(Icons.people_outline_rounded, size: 16, color: cs.onSurfaceVariant),
                   const SizedBox(width: 8),
-                  Text('Est. Affected: ${data['affectedCount'] ?? 0}', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
+                  T('Est. Affected: ${data['affectedCount'] ?? 0}', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -177,7 +174,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
                 children: [
                   Icon(Icons.location_on_outlined, size: 16, color: cs.onSurfaceVariant),
                   const SizedBox(width: 8),
-                  Text('${data['locationWard'] ?? 'Unknown Ward'}, ${data['locationCity'] ?? 'Unknown City'}', 
+                  T('${data['locationWard'] ?? 'Unknown Ward'}, ${data['locationCity'] ?? 'Unknown City'}', 
                     style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
                 ],
               ),
@@ -193,7 +190,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Impact Heatmap', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+        title: T('Impact Heatmap', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadHeatmapData),
         ],
@@ -203,7 +200,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
         : FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: const LatLng(13.0827, 80.2707), // Chennai Default 
+              initialCenter: _initialCenter, // Chennai Default 
               initialZoom: 10,
             ),
             children: [

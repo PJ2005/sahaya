@@ -8,6 +8,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
 import '../l10n/app_text.dart';
+import '../utils/translator.dart';
+
 
 class NgoImpactDashboardScreen extends StatefulWidget {
   final String ngoId;
@@ -36,7 +38,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Impact Metrics', 
+        title: T('Impact Metrics', 
           style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
         centerTitle: true,
       ),
@@ -47,7 +49,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
               children: [
-                Text('WINDOW:', 
+                T('WINDOW:', 
                   style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, 
                     color: cs.onSurfaceVariant, letterSpacing: 1)),
                 const Spacer(),
@@ -132,7 +134,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: active ? Colors.transparent : cs.outlineVariant.withValues(alpha: 0.5)),
         ),
-        child: Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: active ? Colors.white : cs.onSurfaceVariant)),
+        child: T(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: active ? Colors.white : cs.onSurfaceVariant)),
       ),
     );
   }
@@ -196,12 +198,12 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                 children: [
                   const Icon(Icons.warning_amber_rounded, color: SahayaColors.coral),
                   const SizedBox(width: 8),
-                  Text(t.incidentQueue, style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                  T(t.incidentQueue, style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
                 ],
               ),
               const SizedBox(height: 12),
               if (incidents.isEmpty)
-                Text('No stale accepted tasks right now.', style: GoogleFonts.inter(color: cs.onSurfaceVariant))
+                T('No stale accepted tasks right now.', style: GoogleFonts.inter(color: cs.onSurfaceVariant))
               else
                 ...incidents.take(4).map((it) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
@@ -214,16 +216,16 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(it['taskDescription'] ?? 'Task', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
+                      T(it['taskDescription'] ?? 'Task', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
                       const SizedBox(height: 4),
-                      Text('Stale ${it['hoursStale']}h • ${it['sdgTag']}', style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
+                      T('Stale ${it['hoursStale']}h • ${it['sdgTag']}', style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
                         child: ElevatedButton.icon(
                           onPressed: () => _redispatchTask(it['taskId'] as String),
                           icon: const Icon(Icons.restart_alt_rounded, size: 16),
-                          label: const Text('Redispatch'),
+                          label: const T('Redispatch'),
                         ),
                       ),
                     ],
@@ -254,7 +256,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
             children: [
               const Icon(Icons.science_outlined, color: Color(0xFF6366F1)),
               const SizedBox(width: 8),
-              Text('SCENARIO SIMULATOR', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+              T('SCENARIO SIMULATOR', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
             ],
           ),
           const SizedBox(height: 14),
@@ -269,17 +271,17 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
               icon: _simLoading
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.play_arrow_rounded, size: 18),
-              label: Text(_simLoading ? 'Running...' : 'Run Simulation'),
+              label: T(_simLoading ? 'Running...' : 'Run Simulation'),
             ),
           ),
           if (projection != null) ...[
             const SizedBox(height: 14),
-            Text(
+            T(
               'Coverage ${projection['projectedCoveragePercent']}% • Backlog ${projection['expectedBacklogSlots']} slots',
               style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
             ),
             const SizedBox(height: 6),
-            Text(
+            T(
               'Delay ${projection['expectedDelayHours']}h • Risk ${projection['riskLevel']}',
               style: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 12),
             ),
@@ -303,9 +305,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       children: [
         Row(
           children: [
-            Text(label, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12)),
+            T(label, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12)),
             const Spacer(),
-            Text('${value.toStringAsFixed(0)}$unit', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12, color: cs.onSurfaceVariant)),
+            T('${value.toStringAsFixed(0)}$unit', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12, color: cs.onSurfaceVariant)),
           ],
         ),
         Slider(value: value, min: min, max: max, divisions: (max - min).toInt(), onChanged: onChanged),
@@ -329,7 +331,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
             children: [
               Container(width: 12, height: 12, decoration: const BoxDecoration(color: SahayaColors.emerald, shape: BoxShape.circle)),
               const SizedBox(width: 12),
-              Text('COMPLETIONS BY ISSUE', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+              T('COMPLETIONS BY ISSUE', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
             ],
           ),
           const SizedBox(height: 28),
@@ -362,7 +364,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                       showTitles: true, reservedSize: 32, interval: 1,
                       getTitlesWidget: (v, meta) => SideTitleWidget(
                         meta: meta,
-                        child: Text(v.toInt().toString(), style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                        child: T(v.toInt().toString(), style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
                       ),
                     ),
                   ),
@@ -375,7 +377,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                         return SideTitleWidget(
                           meta: meta,
                           space: 12,
-                          child: Text(metrics.labels[index], style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant)),
+                          child: T(metrics.labels[index], style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant)),
                         );
                       },
                     ),
@@ -396,9 +398,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
         children: [
           Icon(Icons.bar_chart_outlined, size: 64, color: Theme.of(context).colorScheme.outlineVariant),
           const SizedBox(height: 16),
-          Text('Analyze your NGO\'s Impact', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
+          T('Analyze your NGO\'s Impact', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Text('Start approving tasks to see live KPIs.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          T('Start approving tasks to see live KPIs.', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -677,14 +679,14 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
           .timeout(const Duration(seconds: 20));
       if (!mounted) return;
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Redispatch triggered.'), backgroundColor: SahayaColors.emerald));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Redispatch triggered.'), backgroundColor: SahayaColors.emerald));
         setState(() {});
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Redispatch failed: ${response.statusCode}'), backgroundColor: SahayaColors.coral));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Redispatch failed: ${response.statusCode}'), backgroundColor: SahayaColors.coral));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Redispatch error: $e'), backgroundColor: SahayaColors.coral));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Redispatch error: $e'), backgroundColor: SahayaColors.coral));
     }
   }
 
@@ -714,7 +716,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Simulation failed: ${response.statusCode}'),
+            content: T('Simulation failed: ${response.statusCode}'),
             backgroundColor: SahayaColors.coral,
           ),
         );
@@ -722,7 +724,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Simulation error: $e'), backgroundColor: SahayaColors.coral),
+        SnackBar(content: T('Simulation error: $e'), backgroundColor: SahayaColors.coral),
       );
     } finally {
       if (!mounted) return;
@@ -782,11 +784,11 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('KPI Drilldown', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
+            T('KPI Drilldown', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
             const SizedBox(height: 10),
             ...lines.map((l) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text('• $l', style: GoogleFonts.inter(fontSize: 13)),
+              child: T('• $l', style: GoogleFonts.inter(fontSize: 13)),
             )),
             const SizedBox(height: 12),
           ],
@@ -829,11 +831,11 @@ class _KpiCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.8)),
+                  T(title, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.8)),
                   const SizedBox(height: 12),
-                  Text(value, style: GoogleFonts.inter(fontSize: 28, color: color, fontWeight: FontWeight.w900)),
+                  T(value, style: GoogleFonts.inter(fontSize: 28, color: color, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 6),
-                  Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500, height: 1.3)),
+                  T(subtitle, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500, height: 1.3)),
                 ],
               ),
             ),

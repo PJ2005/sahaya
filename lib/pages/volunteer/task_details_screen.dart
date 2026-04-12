@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/task_model.dart';
 import '../../theme/sahaya_theme.dart';
 import 'active_task_screen.dart';
+import '../../utils/translator.dart';
+
 
 class TaskDetailsScreen extends StatefulWidget {
   final String taskId;
@@ -115,7 +117,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: SahayaColors.coral));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Failed: $e'), backgroundColor: SahayaColors.coral));
     } finally {
       if (mounted) setState(() => _isAccepting = false);
     }
@@ -130,7 +132,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       future: _contextFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(appBar: AppBar(title: Text('Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w700))), body: Center(child: CircularProgressIndicator(color: cs.primary)));
+          return Scaffold(appBar: AppBar(title: T('Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w700))), body: Center(child: CircularProgressIndicator(color: cs.primary)));
         }
 
         final ctx = snapshot.data ?? {};
@@ -145,7 +147,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         final affected = problemData['affectedCount'] as int? ?? 0;
 
         return Scaffold(
-          appBar: AppBar(title: Text('Mission Briefing', style: GoogleFonts.inter(fontWeight: FontWeight.w700))),
+          appBar: AppBar(title: T('Mission Briefing', style: GoogleFonts.inter(fontWeight: FontWeight.w700))),
           body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -164,7 +166,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         const Icon(Icons.warning_amber_rounded, color: SahayaColors.amber, size: 22),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
+                          child: T(
                             '$severity priority · $affected households affected',
                             style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF92400E)),
                           ),
@@ -193,14 +195,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       const SizedBox(height: 24),
 
                       // ─── Description ───
-                      Text('The Challenge', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
+                      T('The Challenge', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
-                      Text(widget.initialTask.description, style: GoogleFonts.inter(fontSize: 15, height: 1.6, color: isDark ? SahayaColors.darkMuted : const Color(0xFF374151))),
+                      T(widget.initialTask.description, style: GoogleFonts.inter(fontSize: 15, height: 1.6, color: isDark ? SahayaColors.darkMuted : const Color(0xFF374151))),
 
                       const SizedBox(height: 28),
 
                       // ─── Logistics ───
-                      Text('Logistics', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
+                      T('Logistics', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 14),
                       _logisticRow(Icons.location_on_outlined, 'Location', widget.initialTask.locationWard, isDark),
                       _logisticRow(Icons.schedule_rounded, 'Duration', '${widget.initialTask.estimatedDurationHours} hours', isDark),
@@ -210,7 +212,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       const SizedBox(height: 28),
 
                       // ─── Skills ───
-                      Text('Skills Required', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
+                      T('Skills Required', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
@@ -228,7 +230,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (match) ...[Icon(Icons.check_circle_rounded, size: 16, color: SahayaColors.emeraldDark), const SizedBox(width: 6)],
-                                Text(skill, style: GoogleFonts.inter(fontSize: 13, fontWeight: match ? FontWeight.w600 : FontWeight.w500, color: match ? SahayaColors.emeraldDark : cs.onSurface.withValues(alpha: 0.6))),
+                                T(skill, style: GoogleFonts.inter(fontSize: 13, fontWeight: match ? FontWeight.w600 : FontWeight.w500, color: match ? SahayaColors.emeraldDark : cs.onSurface.withValues(alpha: 0.6))),
                               ],
                             ),
                           );
@@ -238,7 +240,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       const SizedBox(height: 28),
 
                       // ─── Contact ───
-                      Text('Point of Contact', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
+                      T('Point of Contact', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 12),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -256,8 +258,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                   CircleAvatar(backgroundColor: cs.primary.withValues(alpha: 0.1), child: Icon(Icons.person_rounded, color: cs.primary)),
                                   const SizedBox(width: 14),
                                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(_ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15)),
-                                    if (_ngoEmail.isNotEmpty) Text(_ngoEmail, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                                    T(_ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15)),
+                                    if (_ngoEmail.isNotEmpty) T(_ngoEmail, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
                                   ])),
                                 ],
                               ),
@@ -280,7 +282,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                                             Icon(Icons.lock_rounded, color: cs.surface, size: 14),
                                             const SizedBox(width: 6),
-                                            Text('Accept to unlock', style: GoogleFonts.inter(color: cs.surface, fontSize: 13, fontWeight: FontWeight.w600)),
+                                            T('Accept to unlock', style: GoogleFonts.inter(color: cs.surface, fontSize: 13, fontWeight: FontWeight.w600)),
                                           ]),
                                         ),
                                       ),
@@ -312,7 +314,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                                 const Icon(Icons.handshake_rounded),
                                 const SizedBox(width: 8),
-                                Text('Accept Mission', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+                                T('Accept Mission', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
                               ]),
                       ),
                     ),
@@ -326,7 +328,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   Widget _chip(String text, Color bg, Color fg) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(28)),
-    child: Text(text, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fg)),
+    child: T(text, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fg)),
   );
 
   Widget _matchExplanationCard(BuildContext context, Map<String, dynamic> matchData, bool isDark) {
@@ -347,7 +349,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           Icon(Icons.tune_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
+            child: T(
               'Matched because: $explanation.',
               style: GoogleFonts.inter(
                 fontSize: 13,
@@ -415,9 +417,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         ),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+          T(title, style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
           const SizedBox(height: 2),
-          Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+          T(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
         ])),
       ],
     ),

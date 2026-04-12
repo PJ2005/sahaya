@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/problem_card.dart';
 import '../models/raw_upload.dart';
+import '../utils/translator.dart';
+
 
 class ManualEntryFormDialog extends StatefulWidget {
   final RawUpload upload;
@@ -63,7 +65,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
         Navigator.pop(context); // Kill strictly mapping dialog
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Human Overwrite Synchronized successfully!'),
+            content: T('Human Overwrite Synchronized successfully!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -73,7 +75,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Firebase Reject natively intercepted: $e'),
+            content: T('Firebase Reject natively intercepted: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -84,7 +86,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Manual Physical Mapping Core'),
+      title: const T('Manual Physical Mapping Core'),
       content: SizedBox(
         width: double.maxFinite,
         child: Form(
@@ -102,7 +104,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
                       .map(
                         (v) => DropdownMenuItem(
                           value: v,
-                          child: Text(v.name.toUpperCase()),
+                          child: T(v.name.toUpperCase()),
                         ),
                       )
                       .toList(),
@@ -117,7 +119,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
                       .map(
                         (v) => DropdownMenuItem(
                           value: v,
-                          child: Text(v.name.toUpperCase()),
+                          child: T(v.name.toUpperCase()),
                         ),
                       )
                       .toList(),
@@ -160,7 +162,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context),
-          child: const Text('Purge Action'),
+          child: const T('Purge Action'),
         ),
         ElevatedButton(
           onPressed: _isSaving ? null : _saveManually,
@@ -170,7 +172,7 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
           ),
           child: _isSaving
               ? const CircularProgressIndicator(color: Colors.white)
-              : const Text('FORCE VALIDATE'),
+              : const T('FORCE VALIDATE'),
         ),
       ],
     );

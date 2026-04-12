@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import '../utils/translator.dart';
+
 
 class OfflineBannerWrapper extends StatefulWidget {
   final Widget child;
@@ -62,7 +64,7 @@ class _OfflineBannerWrapperState extends State<OfflineBannerWrapper> {
                     Icon(Icons.wifi_off, color: Colors.white, size: 16),
                     SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: T(
                         'You are offline. Some data may be stale and actions may retry when online.',
                         style: TextStyle(
                           color: Colors.white,

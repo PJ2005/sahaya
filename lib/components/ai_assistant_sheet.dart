@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/gemini_service.dart';
 import '../theme/sahaya_theme.dart';
+import '../utils/translator.dart';
+
 
 /// A reusable bottom sheet that lets the admin describe changes in natural language.
 /// The AI processes the request and returns modified data via [onResult].
@@ -130,7 +132,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      T(
                         'AI Assistant',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
@@ -138,7 +140,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                           color: cs.onSurface,
                         ),
                       ),
-                      Text(
+                      T(
                         'Describe what you want changed',
                         style: TextStyle(
                           fontSize: 11,
@@ -219,7 +221,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(
+              T(
                 'Error: $_error',
                 style: TextStyle(fontSize: 11, color: cs.error),
               ),
@@ -246,7 +248,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                           size: 16,
                         ),
                         SizedBox(width: 6),
-                        Text(
+                        T(
                           'AI Suggestion Preview',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
@@ -258,7 +260,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                     ),
                     const SizedBox(height: 8),
                     if (changedEntries == null || changedEntries.isEmpty)
-                      Text(
+                      T(
                         'No changes detected.',
                         style: TextStyle(
                           fontSize: 11,
@@ -312,7 +314,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                       children: [
                         TextButton(
                           onPressed: () => setState(() => _preview = null),
-                          child: Text(
+                          child: T(
                             'Discard',
                             style: TextStyle(
                               color: cs.error,
@@ -327,7 +329,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                             Navigator.pop(context);
                           },
                           icon: const Icon(Icons.check, size: 16),
-                          label: const Text(
+                          label: const T(
                             'Apply Changes',
                             style: TextStyle(
                               fontSize: 12,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../flavors.dart';
+import '../utils/translator.dart';
+
 
 class MyHomePage extends StatelessWidget {
   const MyHomePage({super.key});
@@ -7,8 +9,8 @@ class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(F.title)),
-      body: Center(child: Text('Hello ${F.title}')),
+      appBar: AppBar(title: T(F.title)),
+      body: Center(child: T('Hello ${F.title}')),
     );
   }
 }

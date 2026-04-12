@@ -9,6 +9,8 @@ import '../services/gemini_service.dart';
 import '../services/location_geocode_service.dart';
 import '../theme/sahaya_theme.dart';
 import 'review_queue_screen.dart';
+import '../utils/translator.dart';
+
 
 class NgoCreateProblemScreen extends StatefulWidget {
   final String ngoId;
@@ -76,11 +78,11 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
       await batch.commit();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reports created successfully!'), backgroundColor: SahayaColors.emerald));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Reports created successfully!'), backgroundColor: SahayaColors.emerald));
         _routeToQueue();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('AI Extraction failed: $e'), backgroundColor: SahayaColors.coral));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('AI Extraction failed: $e'), backgroundColor: SahayaColors.coral));
     } finally {
       if (mounted) setState(() => _aiProcessing = false);
     }
@@ -125,11 +127,11 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
       } catch (_) {}
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice Field Notes processed!'), backgroundColor: SahayaColors.emerald));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Voice Field Notes processed!'), backgroundColor: SahayaColors.emerald));
         _routeToQueue();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voice Extraction failed: $e'), backgroundColor: SahayaColors.coral));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Voice Extraction failed: $e'), backgroundColor: SahayaColors.coral));
     } finally {
       if (mounted) setState(() => _voiceProcessing = false);
     }
@@ -169,11 +171,11 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
       await FirebaseFirestore.instance.collection('problem_cards').doc(card.id).set(card.toJson());
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report logged!'), backgroundColor: SahayaColors.emerald));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Report logged!'), backgroundColor: SahayaColors.emerald));
         _routeToQueue();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: SahayaColors.coral));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Failed: $e'), backgroundColor: SahayaColors.coral));
     } finally {
       if (mounted) setState(() => _manualProcessing = false);
     }
@@ -190,7 +192,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
     
     return Scaffold(
       appBar: AppBar(
-        title: Text('New Draft', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+        title: T('New Draft', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: cs.primary,
@@ -221,9 +223,9 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('Record Voice Note', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800)),
+          T('Record Voice Note', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
-          Text(
+          T(
             _isRecording ? 'Listening...' : (_recordedFilePath != null ? 'Recording saved natively. Ready to process.' : 'Tap to instantly record field survey notes.'),
             style: GoogleFonts.inter(color: Colors.grey.shade600, fontSize: 14),
             textAlign: TextAlign.center,
@@ -257,7 +259,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
               height: 56,
               child: ElevatedButton.icon(
                 icon: _voiceProcessing ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.auto_awesome_rounded),
-                label: Text(_voiceProcessing ? 'Processing Audio...' : 'Generate from Audio', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
+                label: T(_voiceProcessing ? 'Processing Audio...' : 'Generate from Audio', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
                 onPressed: _voiceProcessing ? null : _submitVoice,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cs.primary,
@@ -279,9 +281,9 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Describe the situation in plain English.', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700)),
+          T('Describe the situation in plain English.', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          Text('Example: "A local well is broken in Ward 4, Chennai. About 150 people don\'t have water. It seems critical."', style: GoogleFonts.inter(color: Colors.grey.shade600, fontSize: 14)),
+          T('Example: "A local well is broken in Ward 4, Chennai. About 150 people don\'t have water. It seems critical."', style: GoogleFonts.inter(color: Colors.grey.shade600, fontSize: 14)),
           const SizedBox(height: 24),
           Expanded(
             child: TextField(
@@ -302,7 +304,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
             height: 56,
             child: ElevatedButton.icon(
               icon: _aiProcessing ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.auto_awesome_rounded),
-              label: Text(_aiProcessing ? 'Generating...' : 'Generate Problem Card', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
+              label: T(_aiProcessing ? 'Generating...' : 'Generate Problem Card', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
               onPressed: _aiProcessing ? null : _submitAI,
               style: ElevatedButton.styleFrom(
                 backgroundColor: cs.primary,
@@ -329,7 +331,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
             DropdownButtonFormField<IssueType>(
               value: _issueType,
               decoration: InputDecoration(labelText: 'Classification', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              items: IssueType.values.map((v) => DropdownMenuItem(value: v, child: Text(v.name.toUpperCase()))).toList(),
+              items: IssueType.values.map((v) => DropdownMenuItem(value: v, child: T(v.name.toUpperCase()))).toList(),
               onChanged: (v) => setState(() => _issueType = v!),
             ),
             if (_issueType == IssueType.other) ...[
@@ -348,7 +350,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
             DropdownButtonFormField<SeverityLevel>(
               value: _severityLevel,
               decoration: InputDecoration(labelText: 'Severity', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              items: SeverityLevel.values.map((v) => DropdownMenuItem(value: v, child: Text(v.name.toUpperCase()))).toList(),
+              items: SeverityLevel.values.map((v) => DropdownMenuItem(value: v, child: T(v.name.toUpperCase()))).toList(),
               onChanged: (v) => setState(() => _severityLevel = v!),
             ),
             const SizedBox(height: 16),
@@ -381,7 +383,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
               height: 56,
               child: ElevatedButton.icon(
                 icon: _manualProcessing ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.check_rounded),
-                label: Text('Save Problem Card', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
+                label: T('Save Problem Card', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
                 onPressed: _manualProcessing ? null : _submitManual,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cs.primary,

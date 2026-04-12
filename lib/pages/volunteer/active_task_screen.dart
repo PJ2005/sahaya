@@ -15,6 +15,8 @@ import '../../services/offline_proof_sync_service.dart';
 import '../../components/success_overlay.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
+import '../../utils/translator.dart';
+
 
 class ActiveTaskScreen extends StatefulWidget {
   final String matchRecordId;
@@ -52,10 +54,10 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
       try {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Maps.')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Could not open Maps.')));
       }
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location not available.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Location not available.')));
     }
   }
 
@@ -105,7 +107,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
     final bool isReadOnly = isCompleted || isSubmitted;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isReadOnly ? 'Mission Summary' : 'Active Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w700))),
+      appBar: AppBar(title: T(isReadOnly ? 'Mission Summary' : 'Active Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w700))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -139,7 +141,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                     color: isCompleted ? Colors.white : cs.primary,
                   ),
                   const SizedBox(height: 16),
-                  Text(
+                  T(
                     isCompleted
                         ? 'Mission Completed'
                         : (isSubmitted
@@ -154,7 +156,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  T(
                     isCompleted
                         ? 'Thank you for your incredible service!'
                         : (isSubmitted
@@ -187,7 +189,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    T(
                       'NGO Feedback',
                       style: GoogleFonts.inter(
                         fontSize: 13,
@@ -196,7 +198,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
+                    T(
                       widget.adminReviewNote!.trim(),
                       style: GoogleFonts.inter(fontSize: 14, height: 1.5),
                     ),
@@ -208,7 +210,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
 
             // ─── Proof Section ───
             if (isReadOnly && widget.proof != null) ...[
-              Text('Your Submission', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
+              T('Your Submission', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(height: 12),
               _buildProofDisplay(context, widget.proof!),
               const Divider(height: 48),
@@ -227,7 +229,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
             ],
 
             // ─── Coordinator ───
-            Text('Coordinator', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700)),
+            T('Coordinator', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(16),
@@ -243,8 +245,8 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                       CircleAvatar(radius: 24, backgroundColor: cs.primary.withValues(alpha: 0.1), child: Icon(Icons.person_rounded, color: cs.primary)),
                       const SizedBox(width: 14),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(widget.ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text(widget.ngoPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                        T(widget.ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        T(widget.ngoPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
                       ])),
                       if (!isReadOnly)
                         IconButton(onPressed: _callCoordinator, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
@@ -257,8 +259,8 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                         CircleAvatar(radius: 24, backgroundColor: SahayaColors.amber.withValues(alpha: 0.1), child: const Icon(Icons.support_agent_rounded, color: SahayaColors.amber)),
                         const SizedBox(width: 14),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Field Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text(widget.coordinatorPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                          T('Field Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                          T(widget.coordinatorPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
                         ])),
                         if (!isReadOnly)
                           IconButton(onPressed: _callCoordinatorDirect, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
@@ -272,9 +274,9 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
             const SizedBox(height: 24),
 
             // ─── Task ───
-            Text('Task Outline', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700)),
+            T('Task Outline', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            Text(widget.task.description, style: GoogleFonts.inter(fontSize: 15, height: 1.6, color: isDark ? SahayaColors.darkMuted : const Color(0xFF374151))),
+            T(widget.task.description, style: GoogleFonts.inter(fontSize: 15, height: 1.6, color: isDark ? SahayaColors.darkMuted : const Color(0xFF374151))),
 
             const SizedBox(height: 100),
           ],
@@ -293,7 +295,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                     _showProofSheet();
                   },
                   icon: const Icon(Icons.camera_alt_rounded),
-                  label: Text('Submit proof', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+                  label: T('Submit proof', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
             ),
@@ -337,9 +339,9 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
             ),
           if (photos.isNotEmpty && note.isNotEmpty) const SizedBox(height: 16),
           if (note.isNotEmpty) ...[
-            Text('NOTE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: cs.primary, letterSpacing: 0.5)),
+            T('NOTE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: cs.primary, letterSpacing: 0.5)),
             const SizedBox(height: 6),
-            Text(note, style: GoogleFonts.inter(fontSize: 14, height: 1.4)),
+            T(note, style: GoogleFonts.inter(fontSize: 14, height: 1.4)),
           ],
         ],
       ),
@@ -375,7 +377,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
           children: [
             Icon(icon, color: color, size: 28),
             const SizedBox(height: 8),
-            Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+            T(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
           ],
         ),
       ),
@@ -434,19 +436,39 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
     }
   }
 
+  bool _isPicking = false;
+
   Future<void> _pickImages() async {
-    final imgs = await _picker.pickMultiImage();
-    if (imgs.isNotEmpty) {
-      setState(() {
-        _images.addAll(imgs);
-        if (_images.length > 3) _images = _images.sublist(0, 3);
-      });
+    if (_isPicking) return;
+    _isPicking = true;
+    try {
+      final imgs = await _picker.pickMultiImage();
+      if (imgs.isNotEmpty && mounted) {
+        setState(() {
+          _images.addAll(imgs);
+          if (_images.length > 3) _images = _images.sublist(0, 3);
+        });
+      }
+    } on PlatformException catch (e) {
+      debugPrint('PlatformException picking images: $e');
+      if (e.code == 'already_active') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: T('Image picker is already open. Please complete or cancel the current selection.'),
+            backgroundColor: SahayaColors.amber,
+          ));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking images: $e');
+    } finally {
+      if (mounted) _isPicking = false;
     }
   }
 
   Future<void> _submit() async {
     if (_images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Attach at least 1 photo.'), backgroundColor: SahayaColors.coral));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Attach at least 1 photo.'), backgroundColor: SahayaColors.coral));
       return;
     }
     setState(() => _submitting = true);
@@ -498,6 +520,9 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
       await FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId).update({
         'proof': {'photoUrls': urls, 'secureUrls': urls, 'note': _noteCtrl.text.trim(), 'submittedAt': FieldValue.serverTimestamp()},
         'status': 'proof_submitted',
+        'aiVerificationLabel': FieldValue.delete(),
+        'aiVerificationReason': FieldValue.delete(),
+        'aiVerifiedAt': FieldValue.delete(),
       });
 
       final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://10.0.2.2:5000';
@@ -513,7 +538,7 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
 
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: SahayaColors.coral));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Upload failed: $e'), backgroundColor: SahayaColors.coral));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -535,9 +560,9 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
             child: Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? SahayaColors.darkBorder : const Color(0xFFD1D5DB), borderRadius: BorderRadius.circular(2))),
           ),
           const SizedBox(height: 20),
-          Text('Submit Proof', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700)),
+          T('Submit Proof', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text('Upload up to 3 photos of your work.', style: GoogleFonts.inter(color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+          T('Upload up to 3 photos of your work.', style: GoogleFonts.inter(color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
           const SizedBox(height: 20),
 
           // Photos
@@ -580,7 +605,7 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(Icons.add_a_photo_rounded, size: 36, color: cs.primary),
                   const SizedBox(height: 8),
-                  Text('Tap to select photos', style: GoogleFonts.inter(color: cs.primary, fontWeight: FontWeight.w600)),
+                  T('Tap to select photos', style: GoogleFonts.inter(color: cs.primary, fontWeight: FontWeight.w600)),
                 ]),
               ),
             ),
@@ -609,7 +634,7 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
               onPressed: _submitting ? null : _submit,
               child: _submitting
                   ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                  : Text('Submit', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+                  : T('Submit', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
             ),
           ),
         ],

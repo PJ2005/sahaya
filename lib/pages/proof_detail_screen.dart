@@ -11,6 +11,7 @@ import '../theme/sahaya_theme.dart';
 import '../models/problem_card.dart';
 import '../services/gemini_service.dart';
 import 'ngo_task_detail_screen.dart';
+import '../utils/translator.dart';
 
 class ProofDetailScreen extends StatefulWidget {
   final String? notificationId;
@@ -35,14 +36,24 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
   List<String> _photos = [];
   String _note = '';
   DateTime? _submittedAt;
-  String? _aiVerificationLabel;
+  String? _aiVerificationLabel;   
   String? _aiVerificationReason;
   bool _aiVerificationLoading = false;
+  StreamSubscription<DocumentSnapshot>? _recordSubscription;
 
   @override
   void initState() {
     super.initState();
-    final proof = widget.matchData['proof'] as Map<String, dynamic>?;
+    _loadInitialData(widget.matchData);
+    _listenToRecord();
+    _loadMetadata();
+    // Fallback: check notifications if reason is missing
+    _fetchNotificationInsight();
+  }
+
+  void _loadInitialData(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final proof = data['proof'] as Map<String, dynamic>?;
     if (proof != null) {
       _photos = List<String>.from(
         proof['photoUrls'] ?? proof['secureUrls'] ?? [],
@@ -52,15 +63,45 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       if (ts is Timestamp) _submittedAt = ts.toDate();
     }
 
-    // Load cached AI result if it was already run previously — skip Gemini call.
-    final cachedLabel = widget.matchData['aiVerificationLabel'] as String?;
-    final cachedReason = widget.matchData['aiVerificationReason'] as String?;
+    final cachedLabel = data['aiVerificationLabel'] as String?;
+    final cachedReason = data['aiVerificationReason'] as String?;
     if (cachedLabel != null && cachedLabel.isNotEmpty) {
       _aiVerificationLabel = cachedLabel;
       _aiVerificationReason = cachedReason;
+    } else {
+      _aiVerificationLabel = null;
+      _aiVerificationReason = null;
     }
 
-    _loadMetadata();
+    // Attempt to extract from 'message' field if present in the data
+    if (_aiVerificationReason == null) {
+      final msg = data['message'] as String?;
+      final extracted = _extractAiInsight(msg);
+      if (extracted != null) {
+        _aiVerificationReason = extracted;
+        _aiVerificationLabel ??= _guessLabel(extracted);
+      }
+    }
+
+    setState(() {});
+  }
+
+  void _listenToRecord() {
+    _recordSubscription = FirebaseFirestore.instance
+        .collection('match_records')
+        .doc(widget.matchRecordId)
+        .snapshots()
+        .listen((snapshot) {
+          if (snapshot.exists && snapshot.data() != null) {
+            _loadInitialData(snapshot.data() as Map<String, dynamic>);
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _recordSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadMetadata() async {
@@ -77,9 +118,6 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       final taskType =
           (_taskData?['taskType'] as String?)?.replaceAll('_', ' ') ??
           'community task';
-      if (_photos.isNotEmpty) {
-        _runAiVerification(taskType);
-      }
 
       final pid = _taskData?['problemCardId'] as String? ?? '';
       if (pid.isNotEmpty) {
@@ -99,43 +137,60 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
     } catch (_) {}
   }
 
-  Future<void> _runAiVerification(String taskType) async {
-    // Already have a cached result (from Firestore or previous run) — skip.
-    if (_aiVerificationLoading || _aiVerificationLabel != null) return;
+  String? _extractAiInsight(String? text) {
+    if (text == null) return null;
+    final regex = RegExp(r'\(AI insight:\s*(.*?)\)', caseSensitive: false);
+    final match = regex.firstMatch(text);
+    if (match != null && match.groupCount >= 1) {
+      return match.group(1)?.trim();
+    }
+    return null;
+  }
 
-    setState(() => _aiVerificationLoading = true);
+  String _guessLabel(String insight) {
+    final lower = insight.toLowerCase();
+    if (lower.contains('no evidence') ||
+        lower.contains('unrelated') ||
+        lower.contains('nothing to do with') ||
+        lower.contains('incorrect')) {
+      return 'unrelated';
+    }
+    if (lower.contains('genuine') ||
+        lower.contains('verified') ||
+        lower.contains('clear evidence') ||
+        lower.contains('shows evidence')) {
+      return 'likely_genuine';
+    }
+    return 'needs_clarification';
+  }
+
+  Future<void> _fetchNotificationInsight() async {
+    if (_aiVerificationReason != null) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
     try {
-      final result = await GeminiService.analyzeProofPhotos(
-        taskType: taskType,
-        photoUrls: _photos,
-      );
-      if (!mounted) return;
+      setState(() => _aiVerificationLoading = true);
+      final qs = await FirebaseFirestore.instance
+          .collection('ngo_notifications')
+          .where('ngoId', isEqualTo: uid)
+          .where('matchRecordId', isEqualTo: widget.matchRecordId)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
 
-      final label = result['label'] ?? 'needs_clarification';
-      final reason = result['reason'] ?? 'No reason returned.';
-
-      setState(() {
-        _aiVerificationLabel = label;
-        _aiVerificationReason = reason;
-      });
-
-      // Persist result to Firestore so future views don't re-call Gemini.
-      FirebaseFirestore.instance
-          .collection('match_records')
-          .doc(widget.matchRecordId)
-          .update({
-            'aiVerificationLabel': label,
-            'aiVerificationReason': reason,
-            'aiVerifiedAt': FieldValue.serverTimestamp(),
-          })
-          .catchError((_) {}); // Non-blocking — UI is already updated.
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _aiVerificationLabel = 'needs_clarification';
-        _aiVerificationReason =
-            'AI verification could not complete. This proof should be reviewed manually.';
-      });
+      if (qs.docs.isNotEmpty && mounted) {
+        final msg = qs.docs.first.data()['message'] as String?;
+        final extracted = _extractAiInsight(msg);
+        if (extracted != null) {
+          setState(() {
+            _aiVerificationReason = extracted;
+            _aiVerificationLabel ??= _guessLabel(extracted);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching notification insight: $e");
     } finally {
       if (mounted) setState(() => _aiVerificationLoading = false);
     }
@@ -157,17 +212,19 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
           dotenv.env['BACKEND_URL'] ??
           'https://sahaya-faas-puz67as73a-uc.a.run.app';
       try {
-        await http.post(
-          Uri.parse('$url/complete-task'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'matchRecordId': widget.matchRecordId}),
-        ).timeout(const Duration(seconds: 15));
+        await http
+            .post(
+              Uri.parse('$url/complete-task'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'matchRecordId': widget.matchRecordId}),
+            )
+            .timeout(const Duration(seconds: 15));
       } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Submission Approved!'),
+            content: T('Submission Approved!'),
             backgroundColor: SahayaColors.emerald,
           ),
         );
@@ -177,7 +234,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: T('Failed: $e'),
             backgroundColor: SahayaColors.coral,
           ),
         );
@@ -191,11 +248,11 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reject Proof'),
+        title: const T('Reject Proof'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Why are you rejecting this submission?'),
+            const T('Why are you rejecting this submission?'),
             const SizedBox(height: 12),
             TextField(
               controller: ctrl,
@@ -210,7 +267,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -221,7 +278,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
               Navigator.pop(ctx);
               _reject(ctrl.text.trim());
             },
-            child: const Text('Reject Submission'),
+            child: const T('Reject Submission'),
           ),
         ],
       ),
@@ -234,7 +291,13 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       await FirebaseFirestore.instance
           .collection('match_records')
           .doc(widget.matchRecordId)
-          .update({'status': 'proof_rejected', 'adminReviewNote': reason});
+          .update({
+            'status': 'proof_rejected',
+            'adminReviewNote': reason,
+            'aiVerificationLabel': FieldValue.delete(),
+            'aiVerificationReason': FieldValue.delete(),
+            'aiVerifiedAt': FieldValue.delete(),
+          });
       await _markNotificationHandled();
 
       final url =
@@ -242,18 +305,20 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
           'https://sahaya-faas-puz67as73a-uc.a.run.app';
       unawaited(() async {
         try {
-          await http.post(
-            Uri.parse('$url/notify-proof-rejected'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'matchRecordId': widget.matchRecordId}),
-          ).timeout(const Duration(seconds: 8));
+          await http
+              .post(
+                Uri.parse('$url/notify-proof-rejected'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({'matchRecordId': widget.matchRecordId}),
+              )
+              .timeout(const Duration(seconds: 8));
         } catch (_) {}
       }());
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Rejected. Volunteer notified.'),
+            content: T('Rejected. Volunteer notified.'),
             backgroundColor: SahayaColors.amber,
           ),
         );
@@ -263,7 +328,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: T('Failed: $e'),
             backgroundColor: SahayaColors.coral,
           ),
         );
@@ -293,7 +358,10 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
           .where('read', isEqualTo: false)
           .get();
       for (final doc in qs.docs) {
-        await doc.reference.update({'read': true, 'handledAt': FieldValue.serverTimestamp()});
+        await doc.reference.update({
+          'read': true,
+          'handledAt': FieldValue.serverTimestamp(),
+        });
       }
     } catch (e) {
       debugPrint("Failed to mark notifications handled: $e");
@@ -307,7 +375,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: T(
           'Review Submission',
           style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18),
         ),
@@ -350,7 +418,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
             const SizedBox(height: 32),
 
             // Evidence Section
-            Text(
+            T(
               'EVIDENCE SUBMITTED',
               style: GoogleFonts.inter(
                 fontSize: 11,
@@ -372,7 +440,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                   ),
                 ),
                 child: Center(
-                  child: Text(
+                  child: T(
                     'No photos uploaded',
                     style: GoogleFonts.inter(color: cs.onSurfaceVariant),
                   ),
@@ -408,7 +476,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
 
             // Volunteer Note
             if (_note.isNotEmpty) ...[
-              Text(
+              T(
                 'VOLUNTEER NOTE',
                 style: GoogleFonts.inter(
                   fontSize: 11,
@@ -430,7 +498,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                     color: cs.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
-                child: Text(
+                child: T(
                   _note,
                   style: GoogleFonts.inter(
                     fontSize: 15,
@@ -490,7 +558,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : Text(
+                      : T(
                           'Approve Submission',
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w800,
@@ -541,7 +609,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
         children: [
           Row(
             children: [
-              Text(
+              T(
                 'MISSION GOAL',
                 style: GoogleFonts.inter(
                   fontSize: 10,
@@ -570,7 +638,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        Text(
+                        T(
                           'FULL TASK',
                           style: GoogleFonts.inter(
                             fontSize: 10,
@@ -591,7 +659,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
+          T(
             _taskData!['description'] ?? '',
             style: GoogleFonts.inter(
               fontSize: 17,
@@ -637,7 +705,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       children: [
         Icon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 8),
-        Text(
+        T(
           '$label: ',
           style: GoogleFonts.inter(
             fontSize: 12,
@@ -646,7 +714,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
           ),
         ),
         Expanded(
-          child: Text(
+          child: T(
             value,
             style: GoogleFonts.inter(
               fontSize: 12,
@@ -666,7 +734,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
         color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
+      child: T(
         text,
         style: GoogleFonts.inter(
           fontSize: 10,
@@ -676,8 +744,6 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       ),
     );
   }
-
-
 
   Widget _aiVerificationPanel(
     BuildContext context,
@@ -728,7 +794,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
+                child: T(
                   'AI Verification',
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -741,11 +807,16 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            _aiVerificationReason ??
-                (_aiVerificationLoading
-                    ? 'Gemini is checking whether the submitted photos show evidence of this task being completed.'
-                    : 'AI verification was not available for this proof.'),
+          T(
+            (_aiVerificationReason != null &&
+                    _aiVerificationReason!.contains(
+                      'Deprecated. Handled automatically via backend.',
+                    ))
+                ? 'AI verification is processing on the server and will update shortly.'
+                : (_aiVerificationReason ??
+                      (_aiVerificationLoading
+                          ? 'Gemini is checking whether the submitted photos show evidence of this task being completed.'
+                          : 'AI verification was not available for this proof.')),
             style: GoogleFonts.inter(
               fontSize: 13,
               height: 1.5,

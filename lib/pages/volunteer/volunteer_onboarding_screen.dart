@@ -6,6 +6,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/volunteer_profile.dart';
 import '../../theme/sahaya_theme.dart';
+import '../../utils/translator.dart';
+
 
 class VolunteerOnboardingScreen extends StatefulWidget {
   const VolunteerOnboardingScreen({super.key});
@@ -55,7 +57,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: SahayaColors.amber));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T(msg), backgroundColor: SahayaColors.amber));
   }
 
   Future<void> _getLocation() async {
@@ -99,7 +101,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Join Sahaya', style: GoogleFonts.inter(fontWeight: FontWeight.w800))),
+      appBar: AppBar(title: T('Join Sahaya', style: GoogleFonts.inter(fontWeight: FontWeight.w800))),
       body: Column(
         children: [
           // Progress
@@ -134,7 +136,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
                   if (_step > 0)
                     TextButton(
                       onPressed: () => _pageCtrl.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-                      child: Text('Back', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      child: T('Back', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                     )
                   else
                     const SizedBox.shrink(),
@@ -145,7 +147,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
                       onPressed: _saving ? null : _next,
                       child: _saving
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text(_step == 2 ? 'Complete' : 'Continue', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                          : T(_step == 2 ? 'Complete' : 'Continue', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
@@ -172,9 +174,9 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
             child: Icon(Icons.my_location_rounded, size: 40, color: cs.primary),
           ),
           const SizedBox(height: 28),
-          Text('Where are you?', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          T('Where are you?', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           const SizedBox(height: 8),
-          Text('We match you with tasks near your location.', style: GoogleFonts.inter(color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
+          T('We match you with tasks near your location.', style: GoogleFonts.inter(color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
           const SizedBox(height: 32),
 
           if (_loc == null) ...[
@@ -184,10 +186,10 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
               child: OutlinedButton.icon(
                 onPressed: _fetching ? null : _getLocation,
                 icon: _fetching ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: cs.primary, strokeWidth: 2)) : const Icon(Icons.gps_fixed_rounded),
-                label: Text(_fetching ? 'Finding...' : 'Share Location'),
+                label: T(_fetching ? 'Finding...' : 'Share Location'),
               ),
             ),
-            if (_locError != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_locError!, style: GoogleFonts.inter(color: SahayaColors.coral, fontSize: 13), textAlign: TextAlign.center)),
+            if (_locError != null) Padding(padding: const EdgeInsets.only(top: 12), child: T(_locError!, style: GoogleFonts.inter(color: SahayaColors.coral, fontSize: 13), textAlign: TextAlign.center)),
           ] else ...[
             Container(
               padding: const EdgeInsets.all(14),
@@ -195,11 +197,11 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.check_circle_rounded, color: SahayaColors.emerald),
                 const SizedBox(width: 10),
-                Text('Location secured', style: GoogleFonts.inter(color: SahayaColors.emeraldDark, fontWeight: FontWeight.w600)),
+                T('Location secured', style: GoogleFonts.inter(color: SahayaColors.emeraldDark, fontWeight: FontWeight.w600)),
               ]),
             ),
             const SizedBox(height: 28),
-            Text('Match Radius', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            T('Match Radius', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
             Slider(
               value: _radius, min: 5, max: 50, divisions: 9,
               label: '${_radius.round()} km',
@@ -207,8 +209,8 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
               activeColor: cs.primary,
             ),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('5 km', style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
-              Text('50 km', style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+              T('5 km', style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+              T('50 km', style: GoogleFonts.inter(fontSize: 12, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
             ]),
           ],
         ],
@@ -224,16 +226,16 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Your Skills', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          T('Your Skills', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           const SizedBox(height: 8),
-          Text('Pick what you\'re good at.', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
+          T('Pick what you\'re good at.', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
           const SizedBox(height: 28),
           Wrap(
             spacing: 10, runSpacing: 10,
             children: _skills.map((s) {
               final on = _picked.contains(s);
               return FilterChip(
-                label: Text(s.replaceAll('_', ' '), style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: on ? Colors.white : cs.onSurface)),
+                label: T(s.replaceAll('_', ' '), style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: on ? Colors.white : cs.onSurface)),
                 selected: on,
                 onSelected: (v) => setState(() { v ? _picked.add(s) : _picked.remove(s); }),
                 backgroundColor: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkSurface : const Color(0xFFF3F4F6),
@@ -273,7 +275,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
                     });
                   }
                 },
-                child: const Text('Add'),
+                child: const T('Add'),
               ),
             ],
           ),
@@ -290,12 +292,12 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Language', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          T('Language', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           const SizedBox(height: 8),
-          Text('Preferred language for task briefings.', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
+          T('Preferred language for task briefings.', style: GoogleFonts.inter(color: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
           const SizedBox(height: 28),
           ..._languages.map((l) => RadioListTile<String>(
-            title: Text(l, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            title: T(l, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
             value: l, groupValue: _lang,
             onChanged: (v) => setState(() => _lang = v),
             activeColor: cs.primary,

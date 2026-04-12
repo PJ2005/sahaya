@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
 import 'proof_detail_screen.dart';
+import '../utils/translator.dart';
+
 
 class ProofReviewScreen extends StatelessWidget {
   final String ngoId;
@@ -14,7 +16,7 @@ class ProofReviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: T(
           'Proof Reviews',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w800,
@@ -103,12 +105,12 @@ class ProofReviewScreen extends StatelessWidget {
             color: SahayaColors.emerald.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
-          Text(
+          T(
             'Nothing to review!',
             style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
           ),
           const SizedBox(height: 8),
-          Text(
+          T(
             'All volunteer proofs are reviewed.',
             style: GoogleFonts.inter(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -203,7 +205,7 @@ class _ProofBlockState extends State<_ProofBlock> {
               ],
             ),
             const SizedBox(height: 14),
-            Text(
+            T(
               _taskDesc ?? 'Loading task details...',
               style: GoogleFonts.inter(
                 fontSize: 15,
@@ -223,7 +225,7 @@ class _ProofBlockState extends State<_ProofBlock> {
                 ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
+                  child: T(
                     'Volunteer $shortVol',
                     style: GoogleFonts.inter(
                       fontSize: 12,
@@ -232,7 +234,7 @@ class _ProofBlockState extends State<_ProofBlock> {
                     ),
                   ),
                 ),
-                Text(
+                T(
                   'TAP TO REVIEW',
                   style: GoogleFonts.inter(
                     fontSize: 9,
@@ -256,7 +258,7 @@ class _ProofBlockState extends State<_ProofBlock> {
         color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
+      child: T(
         text,
         style: GoogleFonts.inter(
           fontSize: 10,
