@@ -64,6 +64,9 @@ dependencies:
   integration_test:
     sdk: flutter
   record: ^6.2.0
+  speech_to_text: ^7.3.0
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:

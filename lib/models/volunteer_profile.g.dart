@@ -24,6 +24,8 @@ _VolunteerProfile _$VolunteerProfileFromJson(Map<String, dynamic> json) =>
         json['availabilityUpdatedAt'] as Timestamp,
       ),
       fcmToken: json['fcmToken'] as String?,
+      tasksCompleted: (json['tasksCompleted'] as num?)?.toInt() ?? 0,
+      trustScore: (json['trustScore'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$VolunteerProfileToJson(_VolunteerProfile instance) =>
@@ -42,4 +44,6 @@ Map<String, dynamic> _$VolunteerProfileToJson(_VolunteerProfile instance) =>
         instance.availabilityUpdatedAt,
       ),
       'fcmToken': instance.fcmToken,
+      'tasksCompleted': instance.tasksCompleted,
+      'trustScore': instance.trustScore,
     };

@@ -5,6 +5,7 @@ import 'upload_screen.dart';
 import 'review_queue_screen.dart';
 import 'ngo_home_screen.dart';
 import 'ngo_impact_dashboard_screen.dart';
+import 'ngo_heatmap_screen.dart';
 
 class NgoDashboard extends StatefulWidget {
   final String ngoId;
@@ -29,6 +30,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
       UploadScreen(ngoId: widget.ngoId),
       ReviewQueueScreen(ngoId: widget.ngoId),
       NgoImpactDashboardScreen(ngoId: widget.ngoId),
+      NgoHeatmapScreen(ngoId: widget.ngoId),
     ];
     _listenForProofNotifications();
   }
@@ -67,7 +69,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
 
           // Hide banner when all notifications are handled
           if (count == 0 && _lastPendingProofCount > 0) {
-            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+            ScaffoldMessenger.of(context).clearSnackBars();
           }
 
           _lastPendingProofCount = count;
@@ -75,29 +77,33 @@ class _NgoDashboardState extends State<NgoDashboard> {
   }
 
   void _showPendingApprovalsBanner(int count) {
+    if (!mounted) return;
+    
     final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentMaterialBanner();
-    messenger.showMaterialBanner(
-      MaterialBanner(
+    messenger.clearSnackBars(); // remove any existing
+    
+    messenger.showSnackBar(
+      SnackBar(
         content: Text(
           count == 1
               ? '1 task is waiting for proof approval.'
               : '$count tasks are waiting for proof approval.',
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        leading: const Icon(Icons.fact_check_outlined),
-        actions: [
-          TextButton(
-            onPressed: () => messenger.hideCurrentMaterialBanner(),
-            child: const Text('DISMISS'),
-          ),
-        ],
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 20), // Float it above the navbar
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        duration: const Duration(seconds: 4),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        action: SnackBarAction(
+          label: 'REVIEW',
+          textColor: Colors.white,
+          onPressed: () {
+            setState(() => _currentIndex = 2); // Jump to Review tab
+          },
+        ),
       ),
     );
-
-    Future.delayed(const Duration(seconds: 5), () {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-    });
   }
 
   @override
@@ -151,6 +157,11 @@ class _NgoDashboardState extends State<NgoDashboard> {
                 icon: Icon(Icons.insights_outlined),
                 selectedIcon: Icon(Icons.insights_rounded),
                 label: 'Impact',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.map_outlined),
+                selectedIcon: Icon(Icons.map_rounded),
+                label: 'Heatmap',
               ),
             ],
           );

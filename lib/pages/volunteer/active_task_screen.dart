@@ -1,14 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../models/task_model.dart';
 import '../../theme/sahaya_theme.dart';
+import '../../services/offline_proof_sync_service.dart';
+import '../../components/success_overlay.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 
 class ActiveTaskScreen extends StatefulWidget {
@@ -80,10 +85,11 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
       builder: (_) => ProofSubmissionSheet(matchRecordId: widget.matchRecordId),
     ).then((submitted) {
       if (submitted == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Proof submitted — waiting for NGO review.'), backgroundColor: SahayaColors.emerald),
+        SuccessOverlay.show(
+          context,
+          'Proof submitted!\nWaiting for NGO review.',
+          onComplete: () => Navigator.of(context).pop(),
         );
-        Navigator.of(context).pop();
       }
     });
   }
@@ -282,7 +288,10 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
               child: SizedBox(
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _showProofSheet,
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _showProofSheet();
+                  },
                   icon: const Icon(Icons.camera_alt_rounded),
                   label: Text('Submit proof', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
@@ -390,6 +399,39 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
   List<XFile> _images = [];
   final TextEditingController _noteCtrl = TextEditingController();
   bool _submitting = false;
+  
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) {
+          if (val == 'done' || val == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
+        onError: (val) => debugPrint('Speech Error: $val'),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) => setState(() {
+            _noteCtrl.text = val.recognizedWords;
+          }),
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
 
   Future<void> _pickImages() async {
     final imgs = await _picker.pickMultiImage();
@@ -408,6 +450,28 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
     }
     setState(() => _submitting = true);
     try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      bool isOffline = connectivityResult.contains(ConnectivityResult.none);
+
+      if (isOffline) {
+        // Queue the proof offline
+        List<String> paths = _images.map((f) => f.path).toList();
+        await OfflineProofSyncService.queueOfflineProof(
+          matchRecordId: widget.matchRecordId,
+          localImagePaths: paths,
+          note: _noteCtrl.text.trim(),
+        );
+
+        if (mounted) {
+          SuccessOverlay.show(
+            context,
+            'Offline Mode:\nProof saved securely.\nIt will sync automatically when online.',
+            onComplete: () => Navigator.of(context).pop(true),
+          );
+        }
+        return;
+      }
+
       final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
       final preset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
       final cloudinary = CloudinaryPublic(cloudName, preset, cache: false);
@@ -509,7 +573,21 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
             ),
 
           const SizedBox(height: 20),
-          TextField(controller: _noteCtrl, maxLength: 200, maxLines: 2, decoration: const InputDecoration(hintText: 'Anything the NGO should know?')),
+          TextField(
+            controller: _noteCtrl, 
+            maxLength: 200, 
+            maxLines: null, 
+            decoration: InputDecoration(
+              hintText: 'Anything the NGO should know?',
+              suffixIcon: GestureDetector(
+                onTap: _listen,
+                child: Icon(
+                  _isListening ? Icons.mic : Icons.mic_none,
+                  color: _isListening ? SahayaColors.coral : cs.primary,
+                ),
+              ),
+            )
+          ),
           const SizedBox(height: 20),
 
           SizedBox(

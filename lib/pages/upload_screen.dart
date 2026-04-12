@@ -27,6 +27,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
   late TabController _tabController;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final TextEditingController _pastedTextController = TextEditingController();
+  final Set<String> _processingUploadIds = {};
   bool _isUploading = false;
 
   @override
@@ -519,11 +520,18 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   _miniPill(context, raw.status.name.toUpperCase(), statusColor.withValues(alpha: 0.1), statusColor),
                   if (raw.status == UploadStatus.pending) ...[
                     const SizedBox(width: 8),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => _processUpload(raw),
-                      icon: Icon(Icons.auto_awesome, color: cs.primary, size: 18),
-                    ),
+                    if (_processingUploadIds.contains(raw.id))
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _processUpload(raw),
+                        icon: Icon(Icons.auto_awesome, color: cs.primary, size: 18),
+                      ),
                   ],
                 ],
               ),
@@ -535,19 +543,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
   }
 
   Future<void> _processUpload(RawUpload raw) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (c) => AlertDialog(
-        content: Row(
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 24),
-            Text("AI Extraction in progress...", style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ),
-    );
+    setState(() => _processingUploadIds.add(raw.id));
 
     try {
       final draftCards = await GeminiService.structureProblemCard(raw);
@@ -555,10 +551,10 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
         await FirebaseFirestore.instance.collection('problem_cards').doc(draftCard.id).set(draftCard.toJson());
       }
       await FirebaseFirestore.instance.collection('raw_uploads').doc(raw.id).update({'status': 'done'});
-      if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) Navigator.pop(context);
       await _handleExtractionFailure(raw, e);
+    } finally {
+      if (mounted) setState(() => _processingUploadIds.remove(raw.id));
     }
   }
 

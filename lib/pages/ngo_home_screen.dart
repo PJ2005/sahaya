@@ -177,18 +177,39 @@ class NgoHomeScreen extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isDark
-                ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                : [const Color(0xFF111827), const Color(0xFF1F2937)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-        ),
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutBack,
+        tween: Tween<double>(begin: -30.0, end: 0.0),
+        builder: (context, value, child) {
+          return Transform.translate(
+            offset: Offset(0, value),
+            child: Opacity(
+              opacity: (1 - (value.abs() / 30)).clamp(0.0, 1.0),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                        : [const Color(0xFF111827), const Color(0xFF1F2937)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? Colors.black38 : const Color(0x33000000),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: child,
+              ),
+            ),
+          );
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

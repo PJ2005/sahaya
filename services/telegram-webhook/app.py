@@ -576,6 +576,71 @@ def notify_proof_submitted():
                 if pc_doc.exists:
                     ngo_id = pc_doc.to_dict().get('ngoId')
 
+        # AI Proof Verification
+        proof_photos = mr_data.get('proof', {}).get('photoUrls', [])
+        if not proof_photos and mr_data.get('proof', {}).get('photoUrl'):
+            proof_photos = [mr_data.get('proof', {}).get('photoUrl')]
+
+        is_auto_approved = False
+        ai_reason = "No photos for AI analysis"
+
+        if proof_photos and genai_client:
+            prompt = f'''
+You are an NGO admin verifying volunteer proof.
+Task description: "{task_desc}"
+Review the attached proof photos. Does the imagery show clear evidence of this specific work being completed?
+Return ONLY valid JSON:
+{{"confidence": 0-100, "reason": "short explanation of evidence"}}
+'''
+            contents = [prompt]
+            for url in proof_photos:
+                try:
+                    res = requests.get(url, timeout=10)
+                    if res.ok:
+                        contents.append({'mime_type': 'image/jpeg', 'data': res.content})
+                except Exception:
+                    pass
+            
+            if len(contents) > 1:
+                try:
+                    resp = genai_client.models.generate_content(model=GEMINI_MODEL, contents=contents)
+                    raw = resp.text or '{}'
+                    m = re.search(r'\{.*\}', raw, re.DOTALL)
+                    cleaned = m.group(0) if m else raw.replace('```json', '').replace('```', '').strip()
+                    parsed = json.loads(cleaned)
+                    confidence = float(parsed.get('confidence', 0))
+                    ai_reason = parsed.get('reason', 'AI checked')
+                    if confidence >= 85:
+                        is_auto_approved = True
+                except Exception as e:
+                    ai_reason = f"AI Error: {e}"
+
+        if is_auto_approved:
+            # Auto Approve Data Changes
+            db.collection('match_records').document(match_record_id).update({
+                'status': 'proof_approved',
+                'aiVerificationReason': f"[AUTO-APPROVED {confidence}%] {ai_reason}",
+            })
+            
+            # Trust & Gamification Increment
+            volunteer_id = mr_data.get('volunteerId')
+            if volunteer_id:
+                vol_ref = db.collection('volunteer_profiles').document(volunteer_id)
+                vol_doc = vol_ref.get()
+                if vol_doc.exists:
+                    v_data = vol_doc.to_dict()
+                    curr_score = v_data.get('trustScore', 0)
+                    tasks_comp = v_data.get('tasksCompleted', 0)
+                    vol_ref.update({
+                        'trustScore': curr_score + 10,
+                        'tasksCompleted': tasks_comp + 1
+                    })
+            
+            # Return immediate success without creating NGO notification queue
+            # (Note: App can poll or rely on stream for completion cascade)
+            return jsonify({'status': 'success', 'autoApproved': True, 'reason': ai_reason}), 200
+
+        # Create Manual Notification if Auto-Approval Fails
         notif_id = str(uuid.uuid4())
         db.collection('ngo_notifications').document(notif_id).set({
             'id': notif_id,
@@ -583,11 +648,11 @@ def notify_proof_submitted():
             'type': 'proof_submitted',
             'matchRecordId': match_record_id,
             'taskId': task_id,
-            'message': f'Proof submitted for: {task_desc} — tap to review.',
+            'message': f'Proof submitted for: {task_desc} — tap to review. (AI insight: {ai_reason})',
             'read': False,
             'createdAt': firestore.SERVER_TIMESTAMP,
         })
-        return jsonify({'status': 'success', 'notificationId': notif_id}), 200
+        return jsonify({'status': 'success', 'autoApproved': False, 'notificationId': notif_id}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -735,6 +800,109 @@ def notify_proof_rejected():
                     print(f"FCM to volunteer failed: {e}")
 
         return jsonify({'status': 'success', 'notificationId': notif_id, 'azureSent': azure_sent, 'fcmSent': fcm_sent}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Gemini Migrated Endpoints ──────────────────────────────────────────────────
+
+@app.route('/api/gemini/extract-problems', methods=['POST'])
+def gemini_extract_problems():
+    if not genai_client:
+        return jsonify({'error': 'Gemini not configured'}), 500
+        
+    data = request.json or {}
+    file_type = data.get('fileType', 'text')
+    text_payload = data.get('textPayload', '')
+    url = data.get('url', '')
+
+    prompt_text = (
+        "You are a massive array-extraction agent for NGO community surveys. "
+        "Extract every single independent field problem into its own logical structure. "
+        "Return ONLY a valid geometric JSON Array `[...]` of mapped objects. "
+        "For EACH independent extracted problem, strictly return: "
+        "- issueType (one of: water_access, sanitation, education, nutrition, healthcare, livelihood, other)\n"
+        "- locationWard (string)\n"
+        "- locationCity (string)\n"
+        "- severityLevel (one of: low, medium, high, critical)\n"
+        "- affectedCount (integer or null)\n"
+        "- description (max 120 chars, anonymized)\n"
+        "- confidenceScore (float 0.0 to 1.0)"
+    )
+
+    contents = []
+    if file_type in ['text', 'csv', 'document'] or text_payload:
+        contents.append(prompt_text)
+        contents.append(f"PAYLOAD NATIVE DATA:\n{text_payload}")
+    else:
+        try:
+            res = requests.get(url, timeout=15)
+            if res.ok:
+                mime_type = res.headers.get('content-type', 'audio/mp4' if file_type == 'audio' else 'image/jpeg')
+                contents.append(prompt_text)
+                contents.append({'mime_type': mime_type, 'data': res.content})
+            else:
+                return jsonify({'error': 'Failed to fetch media'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    try:
+        resp = genai_client.models.generate_content(model=GEMINI_MODEL, contents=contents)
+        raw_text = resp.text or '[]'
+        m = re.search(r'\[.*\]', raw_text, re.DOTALL)
+        cleaned = m.group(0) if m else raw_text.replace('```json', '').replace('```', '').strip()
+        parsed = json.loads(cleaned)
+        return jsonify(parsed), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/gemini/ai-edit', methods=['POST'])
+def gemini_ai_edit_endpoint():
+    data = request.json or {}
+    current_data = data.get('currentData', {})
+    instruction = data.get('instruction', '')
+    context_desc = data.get('contextDescription', 'data structure')
+
+    prompt = f'''
+You are an AI assistant helping an NGO admin edit {context_desc}.
+Here is the current data as JSON:
+{json.dumps(current_data)}
+
+The admin says: "{instruction}"
+Apply the requested changes and return ONLY the full modified JSON object. Return ONLY valid JSON, no markdown wrappers.
+'''
+    try:
+        resp = gemini_generate(prompt)
+        m = re.search(r'\{.*\}', resp, re.DOTALL)
+        cleaned = m.group(0) if m else (resp or '{}').replace('```json', '').replace('```', '').strip()
+        parsed = json.loads(cleaned)
+        return jsonify(parsed), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/gemini/ai-edit-list', methods=['POST'])
+def gemini_ai_edit_list_endpoint():
+    data = request.json or {}
+    current_items = data.get('currentItems', [])
+    instruction = data.get('instruction', '')
+    context_desc = data.get('contextDescription', 'items')
+
+    prompt = f'''
+You are an AI assistant helping an NGO admin refactor {context_desc}.
+Here is the current list of items:
+{json.dumps(current_items)}
+
+The admin says: "{instruction}"
+Apply changes. Return ONLY a valid JSON array. For NEW items, set "id" to "NEW". Return ONLY valid JSON, no markdown.
+'''
+    try:
+        resp = gemini_generate(prompt)
+        m = re.search(r'\[.*\]', resp, re.DOTALL)
+        cleaned = m.group(0) if m else (resp or '[]').replace('```json', '').replace('```', '').strip()
+        parsed = json.loads(cleaned)
+        return jsonify(parsed), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

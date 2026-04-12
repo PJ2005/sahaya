@@ -19,6 +19,8 @@ abstract class VolunteerProfile with _$VolunteerProfile {
     @Default(false) bool isPartialAvailability,
     @TimestampConverter() required DateTime availabilityUpdatedAt,
     String? fcmToken,
+    @Default(0) int tasksCompleted,
+    @Default(0) int trustScore,
   }) = _VolunteerProfile;
 
   factory VolunteerProfile.fromJson(Map<String, dynamic> json) =>

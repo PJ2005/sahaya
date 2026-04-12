@@ -7,6 +7,8 @@ import '../../theme/sahaya_theme.dart';
 import '../../app.dart';
 import 'task_details_screen.dart';
 import 'active_task_screen.dart';
+import '../../services/offline_proof_sync_service.dart';
+import '../../components/skeleton_loader.dart';
 
 class VolunteerHomeScreen extends StatefulWidget {
   final String uid;
@@ -31,6 +33,16 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.04).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    // Background queue processor
+    _triggerOfflineSync();
+  }
+
+  Future<void> _triggerOfflineSync() async {
+    try {
+      await OfflineProofSyncService.attemptSync();
+    } catch (e) {
+      debugPrint("Offline Sync Trigger Error: $e");
+    }
   }
 
   @override
@@ -101,7 +113,16 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: cs.primary));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SkeletonLoader(width: 80, height: 80, borderRadius: 40),
+                  const SizedBox(height: 20),
+                  const SkeletonLoader(width: 200, height: 24, borderRadius: 12),
+                ],
+              ),
+            );
           }
           if (snapshot.hasError ||
               !snapshot.hasData ||
@@ -134,89 +155,102 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Icon
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Icon(
-                Icons.event_available_rounded,
-                size: 44,
-                color: cs.primary,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'Available this\nweekend?',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                height: 1.15,
-                letterSpacing: -1,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Help your community — we\'ll match you with\nnearby tasks based on your skills.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                color: isDark
-                    ? SahayaColors.darkMuted
-                    : SahayaColors.lightMuted,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 44),
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeOutCubic,
+          tween: Tween<double>(begin: 40.0, end: 0.0),
+          builder: (context, value, child) {
+            return Transform.translate(
+              offset: Offset(0, value),
+              child: Opacity(
+                opacity: (1 - (value / 40)).clamp(0.0, 1.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Icon
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: Icon(
+                        Icons.event_available_rounded,
+                        size: 44,
+                        color: cs.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Available this\nweekend?',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                        letterSpacing: -1,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Help your community — we\'ll match you with\nnearby tasks based on your skills.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: isDark
+                            ? SahayaColors.darkMuted
+                            : SahayaColors.lightMuted,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 44),
 
-            // Yes
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () => _updateAvailability(true, false),
-                  child: const Text('Yes, I\'m available'),
+                    // Yes
+                    ScaleTransition(
+                      scale: _pulseAnimation,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () => _updateAvailability(true, false),
+                          child: const Text('Yes, I\'m available'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Partially
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton(
+                        onPressed: () => _updateAvailability(true, true),
+                        child: const Text('Partially — a few hours'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // No
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: TextButton(
+                        onPressed: () => _updateAvailability(false, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isDark
+                              ? SahayaColors.darkMuted
+                              : SahayaColors.lightMuted,
+                        ),
+                        child: const Text('Not this time'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Partially
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: OutlinedButton(
-                onPressed: () => _updateAvailability(true, true),
-                child: const Text('Partially — a few hours'),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // No
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: TextButton(
-                onPressed: () => _updateAvailability(false, false),
-                style: TextButton.styleFrom(
-                  foregroundColor: isDark
-                      ? SahayaColors.darkMuted
-                      : SahayaColors.lightMuted,
-                ),
-                child: const Text('Not this time'),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -254,6 +288,21 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            Icon(Icons.workspace_premium_rounded, color: SahayaColors.coral, size: 22),
+                            const SizedBox(width: 8),
+                            Text(
+                              profile.trustScore > 100 ? 'Community Leader' : (profile.tasksCompleted >= 5 ? 'Verified' : 'Novice'),
+                              style: GoogleFonts.inter(
+                                color: SahayaColors.coral,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         Text(
                           'You\'re checked in',
                           style: GoogleFonts.inter(
@@ -264,9 +313,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Matching you with nearby tasks',
+                          '${profile.tasksCompleted} Missions • ${profile.trustScore} XP',
                           style: GoogleFonts.inter(
-                            color: Colors.white60,
+                            color: Colors.white70,
                             fontSize: 14,
                           ),
                         ),
@@ -357,8 +406,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                   return Center(child: Text('Error: ${matchSnapshot.error}'));
                 }
                 if (matchSnapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                    child: CircularProgressIndicator(color: cs.primary),
+                  return ListView.builder(
+                    itemCount: 3,
+                    padding: const EdgeInsets.only(top: 10),
+                    itemBuilder: (_, __) => const SkeletonMissionCard(),
                   );
                 }
                 if (!matchSnapshot.hasData ||

@@ -34,9 +34,10 @@ class SahayaColors {
 BoxShadow sahayaCardShadow(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return BoxShadow(
-    color: isDark ? Colors.black26 : const Color(0x0A000000),
-    blurRadius: 20,
-    offset: const Offset(0, 4),
+    color: isDark ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+    blurRadius: 24,
+    spreadRadius: 0,
+    offset: const Offset(0, 8),
   );
 }
 
