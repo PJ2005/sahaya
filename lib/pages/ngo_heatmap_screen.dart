@@ -84,8 +84,12 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
         });
         
         if (circles.isNotEmpty) {
-          final first = circles.first.point;
-          _mapController.move(first, 12);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              final first = circles.first.point;
+              _mapController.move(first, 12);
+            }
+          });
         }
       }
     } catch (e) {
