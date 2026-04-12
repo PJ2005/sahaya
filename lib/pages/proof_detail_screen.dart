@@ -273,13 +273,24 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
 
   Future<void> _markNotificationHandled() async {
     final notificationId = widget.notificationId;
-    if (notificationId == null || notificationId.isEmpty) return;
+    if (notificationId != null && notificationId.isNotEmpty) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('ngo_notifications')
+            .doc(notificationId)
+            .update({'read': true, 'handledAt': FieldValue.serverTimestamp()});
+      } catch (_) {}
+    }
 
     try {
-      await FirebaseFirestore.instance
+      final qs = await FirebaseFirestore.instance
           .collection('ngo_notifications')
-          .doc(notificationId)
-          .update({'read': true, 'handledAt': FieldValue.serverTimestamp()});
+          .where('matchRecordId', isEqualTo: widget.matchRecordId)
+          .where('read', isEqualTo: false)
+          .get();
+      for (final doc in qs.docs) {
+        await doc.reference.update({'read': true, 'handledAt': FieldValue.serverTimestamp()});
+      }
     } catch (_) {}
   }
 

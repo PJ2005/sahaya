@@ -17,6 +17,7 @@ class ActiveTaskScreen extends StatefulWidget {
   final String ngoName;
   final String ngoPhone;
   final String ngoEmail;
+  final String coordinatorPhone;
   final String status;
   final Map<String, dynamic>? proof;
   final String? adminReviewNote;
@@ -28,6 +29,7 @@ class ActiveTaskScreen extends StatefulWidget {
     required this.ngoName,
     required this.ngoPhone,
     required this.ngoEmail,
+    this.coordinatorPhone = '',
     this.status = 'accepted',
     this.proof,
     this.adminReviewNote,
@@ -42,8 +44,10 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
     final geo = widget.task.locationGeoPoint;
     if (geo != null) {
       final url = Uri.parse('https://maps.google.com/?q=${geo.latitude},${geo.longitude}');
-      if (await canLaunchUrl(url)) {
+      try {
         await launchUrl(url, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Maps.')));
       }
     } else {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location not available.')));
@@ -54,7 +58,18 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
     final phone = widget.ngoPhone.replaceAll(RegExp(r'[^0-9+]'), '');
     if (phone.isEmpty) return;
     final url = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(url)) await launchUrl(url);
+    try {
+      await launchUrl(url);
+    } catch (_) {}
+  }
+
+  void _callCoordinatorDirect() async {
+    final phone = widget.coordinatorPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (phone.isEmpty) return;
+    final url = Uri.parse('tel:$phone');
+    try {
+      await launchUrl(url);
+    } catch (_) {}
   }
 
   void _showProofSheet() {
@@ -215,16 +230,35 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: isDark ? SahayaColors.darkBorder : SahayaColors.lightBorder),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  CircleAvatar(radius: 24, backgroundColor: cs.primary.withValues(alpha: 0.1), child: Icon(Icons.person_rounded, color: cs.primary)),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(widget.ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                    if (widget.ngoPhone.isNotEmpty) Text(widget.ngoPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
-                  ])),
-                  if (widget.ngoPhone.isNotEmpty && !isReadOnly)
-                    IconButton(onPressed: _callCoordinator, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
+                  Row(
+                    children: [
+                      CircleAvatar(radius: 24, backgroundColor: cs.primary.withValues(alpha: 0.1), child: Icon(Icons.person_rounded, color: cs.primary)),
+                      const SizedBox(width: 14),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(widget.ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(widget.ngoPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                      ])),
+                      if (!isReadOnly)
+                        IconButton(onPressed: _callCoordinator, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
+                    ],
+                  ),
+                  if (widget.coordinatorPhone.isNotEmpty) ...[
+                    const Divider(height: 20),
+                    Row(
+                      children: [
+                        CircleAvatar(radius: 24, backgroundColor: SahayaColors.amber.withValues(alpha: 0.1), child: const Icon(Icons.support_agent_rounded, color: SahayaColors.amber)),
+                        const SizedBox(width: 14),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Field Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(widget.coordinatorPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                        ])),
+                        if (!isReadOnly)
+                          IconButton(onPressed: _callCoordinatorDirect, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

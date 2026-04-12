@@ -51,18 +51,23 @@ class _NgoDashboardState extends State<NgoDashboard> {
 
           final docs = snapshot.docs;
           final count = docs.length;
-          final hasNewNotification = docs.any(
-            (doc) => !_shownNotificationIds.contains(doc.id),
-          );
 
+          // Count genuinely new IDs we haven't shown before
+          int newCount = 0;
           for (final doc in docs) {
-            _shownNotificationIds.add(doc.id);
+            if (_shownNotificationIds.add(doc.id)) {
+              newCount++;
+            }
           }
 
-          if (count > 0 &&
-              hasNewNotification &&
-              count >= _lastPendingProofCount) {
+          // Only show banner if there are genuinely new notifications
+          if (newCount > 0 && count > 0) {
             _showPendingApprovalsBanner(count);
+          }
+
+          // Hide banner when all notifications are handled
+          if (count == 0 && _lastPendingProofCount > 0) {
+            ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
           }
 
           _lastPendingProofCount = count;

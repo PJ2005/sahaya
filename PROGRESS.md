@@ -1,76 +1,134 @@
-# Sahaya Development Progress & Testing Tracker
+### 1. SYSTEM SUMMARY
+Sahaya is an AI-driven disaster response and community empowerment platform bridging NGOs with localized volunteers. NGOs utilize a Flutter-based mobile dashboard to ingest field data (via app uploads or a Telegram bot), which Google Gemini AI transforms into structured `problem_cards` and actionable `tasks`. Volunteers use a dedicated mobile interface to discover local missions, accept tasks, execute actions, and submit cryptographic/visual proof. A Python Flask backend hosted on Azure orchestrates automated task matching, Telegram webhook processing, and push notifications, while Firebase handles all real-time state, authentication, and structured data storage.
 
-## ✅ Completed Changes (March 2026)
-### Day 6 - Mission Briefing, Accept Flow, and Logistics
-1. **Added "What To Bring" Generation via Gemini:**
-   - Modified `run_matching()` in `services/telegram-webhook/app.py` to prompt Gemini directly with the specific task dynamics to natively evaluate one-sentence contextual gear instructions for volunteers (`whatToBring`).
-   - Mapped logic immediately into standard `match_records` documents saving cleanly to Firestore.
-2. **Passed What To Bring into Flutter Engine:**
-   - Transferred this generated variable directly from the dynamic match map in `volunteer_home_screen.dart` into `TaskDetailsScreen`.
-   - Rendered it structurally below the core Mission Logistics block utilizing a backpack icon dynamically cleanly.
-   - Handled text overflows natively by securing layout Columns with `Expanded` widgets to allow long dynamic strings safely wrapped onto new lines.
-   - Cleaned up routing architecture parameter schemas to seamlessly process this field without null crashes native to Flutter's constructor initialization routines.
-3. ***Note:** FCM Notifications were explicitly skipped completely based on architectural constraints defined by the instruction set.*
+### 2. COMPONENT INVENTORY
+- **NGO App (Flutter)**: Role: Admin interface. Inputs: NGO actions, manual data, media. Outputs: Firestore records, Cloudinary URLs.
+- **Volunteer App (Flutter)**: Role: Field execution. Inputs: Location, user action, proof photos. Outputs: `match_records` updates.
+- **Flask Backend (Azure)**: Role: Orchestration. Inputs: HTTP webhooks (Telegram, manual triggers). Outputs: Generated tasks, notifications. Dependencies: Firebase Admin, Telegram API.
+- **Google Gemini (AI Engine)**: Role: Data extraction. Inputs: Raw text/images/audio. Outputs: JSON structured `problem_cards`.
+- **Telegram Bot**: Role: Agile field intake. Inputs: Media/Text from anyone. Outputs: Webhook payloads to Azure.
+- **Cloudinary**: Role: Media storage. Inputs: Image/video blobs. Outputs: CDN URLs.
+- **Firebase Auth**: Role: Identity provider. Inputs: Credentials. Outputs: Auth tokens.
+- **Firestore DB**: Role: State/Storage. Inputs: App/Backend operations. Outputs: Real-time streams.
 
-### Previous Work
-1. **Flutter Models Updated**: 
-   - Added `locationWard` (String) and `locationGeoPoint` (GeoPoint) fields to `TaskModel`.
-   - Updated `OptionalGeoPointConverter` to cleanly serialize location data.
-   - Fixed `MatchRecord` fields strictly expecting `missionBriefing` and `whatToBring` that backend skipped by declaring default optional bindings.
-   - Successfully regenerated Freezed and JSON Serializer files.
-2. **Backend API Updated (Flask)**: 
-   - Modified `services/telegram-webhook/app.py` in the `/generate-tasks` endpoint. The endpoint now extracts the `locationWard` and `locationGeoPoint` from the parent `ProblemCard` and maps it directly onto the new generated tasks before writing them to Firestore.
-3. **Volunteer App Feed Logic Added**:
-   - Upgraded `volunteer_home_screen.dart` core feed. Replaced hardcoded dummy "Scanning for community needs..." block with native Firestore `StreamBuilder`.
-   - Built a dynamic `RecommendedTaskCard` that looks up matching task data and binds it to the interface showing the Match Score, Details, Location Ward, and a "View Task" button.
-   - Fixed Firestore crash caused by strict `orderBy` chaining without generating a physical index structurally locally.
-   - Built `task_details_screen.dart` to open when tapping View Task. This screen shows the full task metadata, skill requirements, match %, and allows standard volunteers to officially Accept the task to trigger array writes organically in Firebase.
-   - Added missing `description` property map directly onto `TaskModel` schema inside Flutter, effectively resolving the undefined getter rendering crash natively.
-4. **Seed Data Updated**:  
-   - Updated the `seed_service.dart` file to handle mock seeding of these new location parameters.
+### 3. ARCHITECTURE DIAGRAM
+```mermaid
+C4Context
+title Sahaya System Architecture - Level 2
+Boundary(system, "Sahaya Ecosystem") {
+    System(ngoApp, "NGO App", "Flutter Admin UI")
+    System(volApp, "Volunteer App", "Flutter Field UI")
+    System(backend, "Flask Orchestrator", "Azure App Service")
+    SystemDb(firestore, "Firestore", "NoSQL State DB")
+}
 
----
+System_Ext(gemini, "Gemini API", "AI Extraction")
+System_Ext(cloudinary, "Cloudinary", "CDN Vault")
+System_Ext(telegram, "Telegram Bot", "Field Intake")
 
-## 🚀 Steps to Test on Your Phone
-
-### Step 1: Re-Upload the Backend Code to Azure
-Yes, you **must** redeploy the backend! Since we made changes to `services/telegram-webhook/app.py` (the Flask app that generates tasks), the cloud environment needs the updated Python file to start writing coordinates to Firestore.
-
-Depending on how you deploy to Azure, use your standard deployment method. For example:
-
-**Option A: Using Azure CLI (az webapp up)**
-```bash
-cd services/telegram-webhook
-az webapp up --name <your-azure-app-name>
+Rel(ngoApp, firestore, "Reads/Writes streams")
+Rel(volApp, firestore, "Reads tasks, updates proofs")
+Rel(ngoApp, gemini, "Direct API for extraction")
+Rel(ngoApp, cloudinary, "Uploads media")
+Rel(volApp, cloudinary, "Uploads proof media")
+Rel(telegram, backend, "Sends media webhooks")
+Rel(backend, firestore, "Admin writes (Tasks, Notifications)")
+Rel(ngoApp, backend, "Triggers HTTP task/notification logic")
 ```
 
-**Option B: Using Git Deployment (if configured)**
-```bash
-git add services/telegram-webhook/app.py
-git commit -m "fix: attach problem coordinates to tasks"
-git push azure main
-```
+### 4. DATA FLOW SUMMARY
+- **Ingestion**: NGO/Bot captures media → Upload to Cloudinary → `raw_uploads` doc created in Firestore.
+- **Extraction**: NGO taps 'Extract' → Gemini parses media → Returns JSON `problem_cards` (status: pending_review).
+- **Task Generation**: NGO approves card → Calls Azure HTTP endpoint → Backend splices problem into `tasks` and assigns `priorityScore`.
+- **Matching**: Volunteer logs in → Location queried → Stream filters eligible tasks in radius → Volunteer accepts → Creates `match_records`.
+- **Proof & Review**: Volunteer completes task → Uploads proof to Cloudinary → Appends `proof` to `match_records` → Triggers Azure HTTP notify → Creates `ngo_notifications` → NGO approves/rejects proof.
 
-### Step 2: Prepare Your Physical Phone
-1. **Android**: Enable **Developer Options** and turn on **USB Debugging**. (Go to Settings > About Phone > Tap "Build Number" 7 times, then go back to System > Developer Options > Enable USB Debugging).
-2. **iOS**: Connect via cable, open Xcode, select the device, and ensure "Developer Mode" is switched on in your iPhone Settings > Privacy & Security.
-3. Plug your phone into your computer.
+### 5. KEY WORKFLOWS
+**1. Field Issue Reporting**
+- NGO or Telegram captures unstructured data.
+- Payload hits backend or Cloudinary.
+- `raw_uploads` document initialized `pending`.
 
-### Step 3: Run the Flutter App
-Open your terminal in VS Code and verify your phone is detected:
-```bash
-flutter devices
-```
+**2. AI Extraction & Structuring**
+- NGO triggers Gemini analysis.
+- Multi-modal prompt analyzes severity, scale, issue classification.
+- `problem_cards` document generated for manual review.
 
-Then, execute the app on your physical device:
-```bash
-flutter run
-```
-*(If you have multiple devices connected, it will prompt you to choose one, or use `flutter run -d <device-id>`)*
+**3. Volunteer Micro-Tasking**
+- Problem card approved.
+- Azure splits card into actionable micro-tasks.
+- Volunteer accepts task → directions opened via Maps Intent → `match_records` instantiates.
 
-### Step 4: Verify the Behavior
-1. Open the Sahaya app on your phone.
-2. As an NGO, add/approve a Problem Card to trigger the `/generate-tasks` process to the Azure backend.
-3. Go to your **Firebase Firestore UI** in your web browser.
-4. Open the `tasks` collection and look at a newly generated task document.
-5. Verify that `locationWard` and `locationGeoPoint` are visible on the new task!
+**4. Proof Validation**
+- Volunteer uploads post-completion images.
+- Cloudinary saves image.
+- Status updates to `proof_submitted`.
+- NGO checks queue, rejects (with feedback) or approves to close out logic.
+
+### 6. DETAILED USE CASE (Most Critical)
+**Name**: Volunteer Task Lifecycle & Verification
+- **Actors**: Volunteer, NGO Admin
+- **Preconditions**: Tasks correctly generated in DB, Volunteer authenticated.
+- **Flow**:
+  1. Volunteer browses `Available Tasks` near their location.
+  2. Selects task and chooses "Accept Mission" → changes status.
+  3. App routes directions via external Google Maps intent.
+  4. Volunteer completes work, opens "Submit Proof" bottom sheet.
+  5. Takes camera photo → uploads to Cloudinary → URL patched to Firestore.
+  6. Azure backend creates unread `ngo_notifications` element via HTTP trigger.
+  7. NGO Admin banner pops up -> clicks Review Proof -> validates visually.
+  8. NGO approves: Task marked `proof_approved`, Volunteer gains impact score.
+
+### 7. FEATURE MATRIX
+
+| Feature | Component(s) | Description |
+|---|---|---|
+| Role-based Dashboards | Flutter | Separate NGO / Volunteer UIs |
+| AI Data Extraction | Flutter + Gemini | Turns photos/audio into structured problem data |
+| Telegram Webhook | Azure + Telegram | Receives media from field reporters automatically |
+| Task Delegation | Azure Backend | Breaks large problems down to manageable tasks |
+| Geo-Matching | Flutter | Links volunteer location to task coordinates |
+| Proof Validation | Flutter + Firestore | Evidence submission to finish lifecycle |
+| Cloud Storage | Cloudinary | Hosts raw ingestion and proof imagery |
+| Realtime Notifications | Firestore + Flutter | Stream listeners popping alert banners |
+
+### 8. API + INTEGRATION MAP
+- **Internal APIs**:
+  - `POST /telegram-webhook`: Parses Telegram bots, uploads media, stages raw.
+  - `POST /process-tasks`: Translates approved problem cards into task splits.
+  - `POST /notify-proof-submitted`: Alerts NGO on volunteer proof completion.
+  - `POST /notify-proof-rejected`: Pushes rejection feedback.
+- **External APIs**:
+  - `Google Gemini API` (`google_generative_ai`): Multimodal prompt engineering.
+  - `Cloudinary SDK`: Direct upload presets via HTTP.
+  - `Telegram API`: Webhook integration (`api.telegram.org/bot<TOKEN>`).
+  - `Firebase SDKs`: Auth, Firestore transactions.
+
+### 9. DATA MODEL
+- **users (Volunteers)**: `uid`, `name`, `score`, `locationGeoPoint`
+- **ngo_profiles**: `id`, `name`, `email`
+- **raw_uploads**: `id`, `ngoId`, `type`, `url`, `status`
+- **problem_cards**: `id`, `ngoId`, `issueType`, `severityLevel`, `priorityScore`, `status`
+- **tasks**: `id`, `problemCardId`, `description`, `requiredVolunteers`, `status`
+- **match_records**: `id`, `taskId`, `volunteerId`, `status`, `proof` (map)
+- **ngo_notifications**: `id`, `ngoId`, `type`, `matchRecordId`, `read`
+
+### 10. SCALABILITY + BOTTLENECKS
+- **Gemini Rate Limits**: Direct client calls to Gemini risk quota bottlenecks on scaling.
+- **Client-Side Heavy DB Queries**: Excessive Firestore reading due to local filtering rather than server-side indexing.
+- **File Upload Times**: Synchronous media uploads can block UI; switch to background.
+- **Map Geocoding Limits**: No heavy clustering, purely linear radial queries [ASSUMED].
+- **Cold Booting**: Azure App Service Free tier sleeps, delaying task/webhook parsing initially.
+
+### 11. SECURITY CONSIDERATIONS
+- **Firestore Roles**: Ensure `rules` are locked. Volunteers cannot read arbitrary NGO logs.
+- **Exposed Keys**: Make sure API keys (`BACKEND_URL`, Cloudinary keys) are strictly kept in git ignored `.env`.
+- **Telegram Webhook Verification**: Ensure secret tokens exist so external bad actors cannot POST fake payloads.
+- **Input Validation**: Null safety handling and explicit regex checks on backend payloads.
+- **Cloudinary Abuse**: Malicious signed uploads can saturate CDN unless restricted to signed backend generation limiters.
+
+### 12. MISSING / NEXT FEATURES
+1. **Push Notifications (FCM)**: Transition from active Firestore streams to proper background device Push Notifications.
+2. **Backend Authentication**: Secure Azure HTTP routes via Bearer Tokens matching Firebase Admin UID.
+3. **Task Clustering (Geospatial)**: Use geohashes to properly optimize local assignment filtering at scale.
+4. **Server-Side AI Logic**: Move Gemini prompting from Flutter to Azure to hide prompts and API keys securely.

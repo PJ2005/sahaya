@@ -337,9 +337,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
               tabs: const [
-                Tab(child: _MarqueeText(text: 'Available')),
+                Tab(child: Text('Available')),
                 Tab(child: _MarqueeText(text: 'My Missions')),
-                Tab(child: _MarqueeText(text: 'History')),
+                Tab(child: Text('History')),
               ],
             ),
           ),
@@ -778,8 +778,9 @@ class _TaskCard extends StatelessWidget {
           matchRecordId: matchMap['id'] ?? '',
           task: task,
           ngoName: ngoName,
-          ngoPhone: ngoPhone,
+          ngoPhone: ngoPhone.isNotEmpty ? ngoPhone : '+91 98400 00001',
           ngoEmail: ngoEmail,
+          coordinatorPhone: '+91 98400 00002',
           status: matchMap['status'] ?? 'accepted',
           proof: matchMap['proof'] as Map<String, dynamic>?,
           adminReviewNote: matchMap['adminReviewNote'] as String?,
@@ -814,58 +815,69 @@ class _MarqueeText extends StatefulWidget {
   State<_MarqueeText> createState() => _MarqueeTextState();
 }
 
-class _MarqueeTextState extends State<_MarqueeText> {
-  late ScrollController _scrollController;
+class _MarqueeTextState extends State<_MarqueeText>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late double _textWidth;
+  static const double _gap = 32.0;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
+    // Measure text width once — no LayoutBuilder needed
+    final tp = TextPainter(
+      text: TextSpan(text: widget.text, style: _style),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    _textWidth = tp.size.width;
+
+    // Duration proportional to text length for constant speed feel
+    final ms = ((_textWidth + _gap) * 50).toInt().clamp(2000, 8000);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: ms),
+    )..repeat();
   }
+
+  TextStyle get _style =>
+      widget.style ?? GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13);
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _ctrl.dispose();
     super.dispose();
-  }
-
-  void _startScrolling() async {
-    if (!_scrollController.hasClients) return;
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    if (maxScroll <= 0) return;
-
-    while (mounted) {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) break;
-      await _scrollController.animateTo(
-        maxScroll,
-        duration: Duration(milliseconds: (maxScroll * 40).toInt()),
-        curve: Curves.linear,
-      );
-      if (!mounted) break;
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) break;
-      _scrollController.jumpTo(0);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      scrollDirection: Axis.horizontal,
-      physics: const NeverScrollableScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text(
-          widget.text,
-          style:
-              widget.style ??
-              GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
-          maxLines: 1,
-        ),
-      ),
+    final totalWidth = _textWidth + _gap;
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final offset = _ctrl.value * totalWidth;
+        // ClipRect clips to Tab's width.
+        // OverflowBox lets the Row be wider than the Tab without overflow errors.
+        // Transform slides the Row left — two copies ensure seamless loop.
+        return ClipRect(
+          child: OverflowBox(
+            maxWidth: double.infinity,
+            alignment: Alignment.centerLeft,
+            child: Transform.translate(
+              offset: Offset(-offset, 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.text, style: _style, maxLines: 1),
+                  const SizedBox(width: _gap),
+                  Text(widget.text, style: _style, maxLines: 1),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
