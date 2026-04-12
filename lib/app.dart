@@ -6,6 +6,7 @@ import 'flavors.dart';
 import 'pages/ngo_dashboard.dart';
 import 'pages/volunteer/volunteer_gateway.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'components/offline_banner_wrapper.dart';
 import 'theme/sahaya_theme.dart';
 import 'theme/theme_provider.dart';
@@ -38,10 +39,18 @@ class _AuthGatewayState extends State<AuthGateway> {
           password: _passwordController.text.trim(),
         );
       } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+        if (cred.user != null) {
+          await FirebaseFirestore.instance.collection('ngo_profiles').doc(cred.user!.uid).set({
+            'id': cred.user!.uid,
+            'email': cred.user!.email,
+            'name': 'Default NGO Organization',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {

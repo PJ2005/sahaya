@@ -214,16 +214,17 @@ class _ReviewBlock extends StatelessWidget {
 
   void _navigateToDetail(BuildContext context) async {
     final upload = await _loadLinkedUpload();
-    if (upload == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Raw evidence not found for this card.')),
-        );
-      }
-      return;
-    }
 
     if (card.status == ProblemStatus.extraction_failed) {
+      if (upload == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot recover: Raw evidence completely missing.')),
+          );
+        }
+        return;
+      }
+
       if (context.mounted) {
         showDialog(
           context: context,
@@ -249,31 +250,40 @@ class _ReviewBlock extends StatelessWidget {
   Future<RawUpload?> _loadLinkedUpload() async {
     final db = FirebaseFirestore.instance;
 
-    // Pending-review Gemini cards are stored as rawUploadId_index.
     final String parentUploadId = card.id.contains('_')
         ? card.id.split('_').first
         : card.id;
-
-    final directDoc = await db.collection('raw_uploads').doc(parentUploadId).get();
-    if (directDoc.exists) {
-      final data = directDoc.data();
-      if (data != null && data['ngoId'] == ngoId) {
-        return RawUpload.fromJson({...data, 'id': directDoc.id});
-      }
+        
+    // Fast-fail: Directly created internal cards have no raw upload payload!
+    if (parentUploadId.startsWith('manual') || card.id.startsWith('manual')) {
+      return null;
     }
 
-    final linkedSnap = await db
-        .collection('raw_uploads')
-        .where('ngoId', isEqualTo: ngoId)
-        .where('problemCardId', isEqualTo: card.id)
-        .limit(1)
-        .get();
+    try {
+      final directDoc = await db.collection('raw_uploads').doc(parentUploadId).get(const GetOptions(source: Source.serverAndCache));
+      if (directDoc.exists) {
+        final data = directDoc.data();
+        if (data != null && data['ngoId'] == ngoId) {
+          return RawUpload.fromJson({...data, 'id': directDoc.id});
+        }
+      }
 
-    if (linkedSnap.docs.isEmpty) return null;
-    return RawUpload.fromJson({
-      ...linkedSnap.docs.first.data(),
-      'id': linkedSnap.docs.first.id,
-    });
+      final linkedSnap = await db
+          .collection('raw_uploads')
+          .where('ngoId', isEqualTo: ngoId)
+          .where('problemCardId', isEqualTo: card.id)
+          .limit(1)
+          .get(const GetOptions(source: Source.serverAndCache));
+
+      if (linkedSnap.docs.isEmpty) return null;
+      return RawUpload.fromJson({
+        ...linkedSnap.docs.first.data(),
+        'id': linkedSnap.docs.first.id,
+      });
+    } catch (e) {
+      debugPrint('Failed to load linked upload due to network/firestore transient error: $e');
+      return null;
+    }
   }
 
   Widget _miniPill(BuildContext context, String text, Color bg, Color fg) {

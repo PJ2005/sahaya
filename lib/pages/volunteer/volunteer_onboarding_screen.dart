@@ -27,6 +27,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
   // Step 2
   final _skills = ['communication', 'data_entry', 'transport', 'technical', 'medical', 'education', 'physical_labor', 'community_outreach'];
   final Set<String> _picked = {};
+  final TextEditingController _customSkillCtrl = TextEditingController();
 
   // Step 3
   final _languages = ['Tamil', 'Telugu', 'Hindi', 'English', 'Other'];
@@ -37,7 +38,16 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
   void _next() {
     if (_step == 0 && _loc == null) { _snack('Share your location to continue'); return; }
     if (_step == 1 && _picked.isEmpty) { _snack('Pick at least one skill'); return; }
-    if (_step < 2) { _pageCtrl.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut); }
+    if (_step < 2) { 
+      // If the user typed a custom skill but forgot to hit Add, auto-add it
+      final text = _customSkillCtrl.text.trim().toLowerCase().replaceAll(' ', '_');
+      if (_step == 1 && text.isNotEmpty && !_skills.contains(text)) {
+        _skills.add(text);
+        _picked.add(text);
+        _customSkillCtrl.clear();
+      }
+      _pageCtrl.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut); 
+    }
     else {
       if (_lang == null) { _snack('Select a language'); return; }
       _complete();
@@ -65,11 +75,17 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
   Future<void> _complete() async {
     setState(() => _saving = true);
     try {
-      final user = FirebaseAuth.instance.currentUser!;
-      final token = await FirebaseMessaging.instance.getToken();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Authentication lost. Please restart the app.');
+      
+      String? token;
+      try {
+        token = await FirebaseMessaging.instance.getToken();
+      } catch (_) {}
+
       final profile = VolunteerProfile(
-        id: user.uid, uid: user.uid, locationGeoPoint: _loc!, radiusKm: _radius,
-        skillTags: _picked.toList(), languagePref: _lang!, availabilityWindowActive: true,
+        id: user.uid, uid: user.uid, locationGeoPoint: _loc ?? const GeoPoint(0, 0), radiusKm: _radius,
+        skillTags: _picked.toList(), languagePref: _lang ?? 'English', availabilityWindowActive: true,
         availabilityUpdatedAt: DateTime.now(), fcmToken: token,
       );
       await FirebaseFirestore.instance.collection('volunteer_profiles').doc(user.uid).set(profile.toJson());
@@ -226,6 +242,40 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28), side: BorderSide(color: on ? cs.primary : (Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkBorder : SahayaColors.lightBorder))),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _customSkillCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Add custom skill...',
+                    hintStyle: GoogleFonts.inter(fontSize: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                onPressed: () {
+                  final text = _customSkillCtrl.text.trim().toLowerCase().replaceAll(' ', '_');
+                  if (text.isNotEmpty) {
+                    setState(() {
+                      if (!_skills.contains(text)) _skills.add(text);
+                      _picked.add(text);
+                      _customSkillCtrl.clear();
+                    });
+                  }
+                },
+                child: const Text('Add'),
+              ),
+            ],
           ),
         ],
       ),

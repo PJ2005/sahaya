@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "669877574860",
+    "project_id": "sahaya-7df6d",
+    "storage_bucket": "sahaya-7df6d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:669877574860:android:92e93266e5632623bcf669",
+        "android_client_info": {
+          "package_name": "com.sahaya.ngo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDT8gF0zO_LqhQCzfgXgu-GmINlrI0EtrE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:669877574860:android:0a47063cf4592cadbcf669",
+        "android_client_info": {
+          "package_name": "com.sahaya.volunteer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDT8gF0zO_LqhQCzfgXgu-GmINlrI0EtrE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

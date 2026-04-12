@@ -63,6 +63,7 @@ dependencies:
   google_fonts: ^6.2.1
   integration_test:
     sdk: flutter
+  record: ^6.2.0
 
 dev_dependencies:
   flutter_test:

@@ -6,7 +6,8 @@ import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
 import '../app.dart';
 import 'proof_review_screen.dart';
-import 'ngo_task_detail_screen.dart'; // Added missing import
+import 'ngo_task_detail_screen.dart';
+import 'ngo_create_problem_screen.dart';
 
 class NgoHomeScreen extends StatelessWidget {
   final String ngoId;
@@ -149,10 +150,23 @@ class NgoHomeScreen extends StatelessWidget {
                     }, childCount: docs.length),
                   ),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => NgoCreateProblemScreen(ngoId: ngoId),
+            ),
+          );
+        },
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: Text('New Problem', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
       ),
     );
   }
@@ -252,35 +266,21 @@ class NgoHomeScreen extends StatelessWidget {
           .where('ngoId', isEqualTo: ngoId)
           .snapshots(),
       builder: (context, cardsSnapshot) {
-        final cardIds =
-            cardsSnapshot.data?.docs.map((doc) => doc.id).toSet() ?? <String>{};
+        if (!cardsSnapshot.hasData) return const SizedBox.shrink();
+        final cardIds = cardsSnapshot.data!.docs.map((doc) => doc.id).toSet();
 
         return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
-          builder: (context, tasksSnapshot) {
-            final taskIds = tasksSnapshot.data?.docs
-                    .where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final problemCardId = data['problemCardId'] as String? ?? '';
-                      return cardIds.contains(problemCardId);
-                    })
-                    .map((doc) => doc.id)
-                    .toSet() ??
-                <String>{};
-
-            return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('match_records')
-                  .where('status', isEqualTo: 'proof_submitted')
-                  .snapshots(),
-              builder: (context, matchSnapshot) {
-                final count = matchSnapshot.data?.docs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final taskId = data['taskId'] as String? ?? '';
-                      return taskIds.contains(taskId);
-                    }).length ??
-                    0;
-
+          stream: FirebaseFirestore.instance 
+              .collection('match_records')
+              .where('status', isEqualTo: 'proof_submitted')
+              .snapshots(),
+          builder: (context, matchSnapshot) {
+            if (!matchSnapshot.hasData) return const SizedBox.shrink();
+            
+            return FutureBuilder<int>(
+              future: _countMyPendingProofs(matchSnapshot.data!.docs, cardIds),
+              builder: (context, countSnapshot) {
+                final count = countSnapshot.data ?? 0;
                 return IconButton(
                   icon: Badge(
                     isLabelVisible: count > 0,
@@ -300,6 +300,26 @@ class NgoHomeScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<int> _countMyPendingProofs(List<QueryDocumentSnapshot> matchDocs, Set<String> myCardIds) async {
+    if (matchDocs.isEmpty) return 0;
+    int count = 0;
+    for (final mDoc in matchDocs) {
+      final mData = mDoc.data() as Map<String, dynamic>;
+      final taskId = mData['taskId'] as String? ?? '';
+      if (taskId.isEmpty) continue;
+      
+      final tDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+      if (tDoc.exists) {
+        final tData = tDoc.data() as Map<String, dynamic>;
+        final problemCardId = tData['problemCardId'] as String? ?? '';
+        if (myCardIds.contains(problemCardId)) {
+          count++;
+        }
+      }
+    }
+    return count;
   }
 
   Widget _emptyState(BuildContext context) {

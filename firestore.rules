@@ -22,6 +22,10 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow read, update, create, delete: if isAuthenticated();
     }
+    match /ngo_profiles/{profileId} {
+      allow read, update, delete: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.id;
+    }
     match /volunteer_profiles/{profileId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == profileId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
@@ -44,6 +48,11 @@ service cloud.firestore {
     match /volunteer_notifications/{notificationId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.volunteerId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.volunteerId;
+    }
+
+    match /ngo_notifications/{notificationId} {
+      allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
+      allow create: if isAuthenticated(); // Backend or Telegram bot can create
     }
   }
 }

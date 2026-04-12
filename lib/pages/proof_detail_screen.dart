@@ -50,6 +50,15 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       final ts = proof['submittedAt'];
       if (ts is Timestamp) _submittedAt = ts.toDate();
     }
+
+    // Load cached AI result if it was already run previously — skip Gemini call.
+    final cachedLabel = widget.matchData['aiVerificationLabel'] as String?;
+    final cachedReason = widget.matchData['aiVerificationReason'] as String?;
+    if (cachedLabel != null && cachedLabel.isNotEmpty) {
+      _aiVerificationLabel = cachedLabel;
+      _aiVerificationReason = cachedReason;
+    }
+
     _loadMetadata();
   }
 
@@ -90,6 +99,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
   }
 
   Future<void> _runAiVerification(String taskType) async {
+    // Already have a cached result (from Firestore or previous run) — skip.
     if (_aiVerificationLoading || _aiVerificationLabel != null) return;
 
     setState(() => _aiVerificationLoading = true);
@@ -99,16 +109,31 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
         photoUrls: _photos,
       );
       if (!mounted) return;
+
+      final label = result['label'] ?? 'needs_clarification';
+      final reason = result['reason'] ?? 'No reason returned.';
+
       setState(() {
-        _aiVerificationLabel = result['label'];
-        _aiVerificationReason = result['reason'];
+        _aiVerificationLabel = label;
+        _aiVerificationReason = reason;
       });
+
+      // Persist result to Firestore so future views don't re-call Gemini.
+      FirebaseFirestore.instance
+          .collection('match_records')
+          .doc(widget.matchRecordId)
+          .update({
+            'aiVerificationLabel': label,
+            'aiVerificationReason': reason,
+            'aiVerifiedAt': FieldValue.serverTimestamp(),
+          })
+          .catchError((_) {}); // Non-blocking — UI is already updated.
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _aiVerificationLabel = 'needs_clarification';
         _aiVerificationReason =
-            'AI verification could not complete, so this proof should be reviewed manually.';
+            'AI verification could not complete. This proof should be reviewed manually.';
       });
     } finally {
       if (mounted) setState(() => _aiVerificationLoading = false);
@@ -135,7 +160,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
           Uri.parse('$url/complete-task'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'matchRecordId': widget.matchRecordId}),
-        );
+        ).timeout(const Duration(seconds: 15));
       } catch (_) {}
 
       if (mounted) {

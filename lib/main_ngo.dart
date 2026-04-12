@@ -12,7 +12,11 @@ const bool useEmulator = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (_) {
+    // .env not bundled in release — app uses compile-time/native env values.
+  }
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   if (useEmulator) {

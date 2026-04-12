@@ -391,8 +391,14 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
 
       final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://10.0.2.2:5000';
       try {
-        await http.post(Uri.parse('$backendUrl/notify-proof-submitted'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'matchRecordId': widget.matchRecordId}));
-      } catch (_) {}
+        await http.post(
+          Uri.parse('$backendUrl/notify-proof-submitted'), 
+          headers: {'Content-Type': 'application/json'}, 
+          body: jsonEncode({'matchRecordId': widget.matchRecordId})
+        ).timeout(const Duration(seconds: 15));
+      } catch (e) {
+        debugPrint('Backend relay failed: $e');
+      }
 
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {

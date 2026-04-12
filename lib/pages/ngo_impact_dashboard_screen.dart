@@ -25,7 +25,8 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Impact Metrics', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
+        title: Text('Impact Metrics', 
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
         centerTitle: true,
       ),
       body: Column(
@@ -35,7 +36,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
               children: [
-                Text('WINDOW:', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 1)),
+                Text('WINDOW:', 
+                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, 
+                    color: cs.onSurfaceVariant, letterSpacing: 1)),
                 const Spacer(),
                 _toggleButton(7, '7D'),
                 const SizedBox(width: 8),
@@ -48,45 +51,44 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
           
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('problem_cards').where('ngoId', isEqualTo: widget.ngoId).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('problem_cards')
+                  .where('ngoId', isEqualTo: widget.ngoId)
+                  .snapshots(),
               builder: (context, cardsSnapshot) {
                 if (cardsSnapshot.connectionState == ConnectionState.waiting) return const ListShimmer(itemCount: 6);
                 final cards = cardsSnapshot.data?.docs ?? [];
                 if (cards.isEmpty) return _buildNoData(context);
 
-                return StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
-                  builder: (context, tasksSnapshot) {
-                    if (!tasksSnapshot.hasData) return const ListShimmer(itemCount: 6);
+                return FutureBuilder<Map<String, List<QueryDocumentSnapshot>>>(
+                  future: _loadAnalyticsData(cards),
+                  builder: (context, dataSnapshot) {
+                    if (!dataSnapshot.hasData) return const ListShimmer(itemCount: 6);
+                    
+                    final tasks = dataSnapshot.data!['tasks']!;
+                    final matches = dataSnapshot.data!['matches']!;
 
-                    return StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('match_records').snapshots(),
-                      builder: (context, matchSnapshot) {
-                        if (!matchSnapshot.hasData) return const ListShimmer(itemCount: 6);
+                    return FutureBuilder<_ImpactMetrics>(
+                      future: _computeMetrics(
+                        cards,
+                        tasks,
+                        matches,
+                        windowStart,
+                      ),
+                      builder: (context, metricsSnapshot) {
+                        if (!metricsSnapshot.hasData) {
+                          return const ListShimmer(itemCount: 6);
+                        }
 
-                        return FutureBuilder<_ImpactMetrics>(
-                          future: _computeMetrics(
-                            cards,
-                            tasksSnapshot.data!.docs,
-                            matchSnapshot.data!.docs,
-                            windowStart,
-                          ),
-                          builder: (context, metricsSnapshot) {
-                            if (!metricsSnapshot.hasData) {
-                              return const ListShimmer(itemCount: 6);
-                            }
-
-                            final metrics = metricsSnapshot.data!;
-                            return ListView(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                              children: [
-                                _buildKpiGrid(metrics),
-                                const SizedBox(height: 24),
-                                _buildImpactCard(context, metrics, cs, isDark),
-                                const SizedBox(height: 20),
-                              ],
-                            );
-                          },
+                        final metrics = metricsSnapshot.data!;
+                        return ListView(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                          children: [
+                            _buildKpiGrid(metrics),
+                            const SizedBox(height: 24),
+                            _buildImpactCard(context, metrics, cs, isDark),
+                            const SizedBox(height: 20),
+                          ],
                         );
                       },
                     );
@@ -231,6 +233,31 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     );
   }
 
+  Future<Map<String, List<QueryDocumentSnapshot>>> _loadAnalyticsData(List<QueryDocumentSnapshot> cards) async {
+    final cardIds = cards.map((c) => c.id).toList();
+    if (cardIds.isEmpty) return {'tasks': [], 'matches': []};
+
+    final tasksSnapshot = await FirebaseFirestore.instance
+        .collection('tasks')
+        .where('problemCardId', whereIn: cardIds.take(10).toList())
+        .get();
+        
+    final taskIds = tasksSnapshot.docs.map((t) => t.id).toList();
+    if (taskIds.isEmpty) {
+      return {'tasks': tasksSnapshot.docs, 'matches': []};
+    }
+
+    final matchesSnapshot = await FirebaseFirestore.instance
+        .collection('match_records')
+        .where('taskId', whereIn: taskIds.take(10).toList())
+        .get();
+
+    return {
+      'tasks': tasksSnapshot.docs,
+      'matches': matchesSnapshot.docs,
+    };
+  }
+
   Future<_ImpactMetrics> _computeMetrics(
     List<QueryDocumentSnapshot> cardDocs,
     List<QueryDocumentSnapshot> taskDocs,
@@ -265,7 +292,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
         if (created == null) continue;
         if (firstTaskTime == null || created.isBefore(firstTaskTime)) firstTaskTime = created;
       }
-      if (firstTaskTime == null || firstTaskTime.isBefore(windowStart)) continue;
+      if (firstTaskTime == null) continue;
 
       final uploadedAt = await _uploadedAtForCard(entry.key);
       if (uploadedAt == null || firstTaskTime.isBefore(uploadedAt)) continue;
@@ -383,13 +410,13 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       return _uploadedAtCache[cardId];
     }
 
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('raw_uploads')
-            .where('ngoId', isEqualTo: widget.ngoId)
-            .where('problemCardId', isEqualTo: cardId)
-            .limit(1)
-            .get();
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('raw_uploads')
+          .where('ngoId', isEqualTo: widget.ngoId)
+          .where('problemCardId', isEqualTo: cardId)
+          .limit(1)
+          .get();
 
       DateTime? uploadedAt;
       if (snapshot.docs.isNotEmpty) {

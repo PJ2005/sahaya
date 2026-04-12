@@ -4,10 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/raw_upload.dart';
 import '../components/ai_assistant_sheet.dart';
 import '../services/location_geocode_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../theme/sahaya_theme.dart';
 
 class ReviewDetailScreen extends StatefulWidget {
-  final RawUpload upload;
+  final RawUpload? upload;
   final Map<String, dynamic> extraction;
 
   const ReviewDetailScreen({
@@ -31,7 +34,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     _editedData = Map<String, dynamic>.from(widget.extraction);
     _cardId = (widget.extraction['id']?.toString().isNotEmpty ?? false)
         ? widget.extraction['id'].toString()
-        : widget.upload.id;
+        : (widget.upload?.id ?? 'manual_draft');
   }
 
   Future<void> _approve() async {
@@ -49,7 +52,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           .set({
             ..._editedData,
             'id': _cardId,
-            'ngoId': widget.upload.ngoId,
+            'ngoId': widget.upload?.ngoId ?? widget.extraction['ngoId'],
             'status': 'approved',
             'createdAt': FieldValue.serverTimestamp(),
             'confidenceScore': 0.9,
@@ -57,10 +60,36 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             'priorityScore': 50.0, // Initial priority
           }, SetOptions(merge: true));
 
-      await FirebaseFirestore.instance
-          .collection('raw_uploads')
-          .doc(widget.upload.id)
-          .update({'status': 'done', 'problemCardId': _cardId});
+      if (widget.upload != null) {
+        await FirebaseFirestore.instance
+            .collection('raw_uploads')
+            .doc(widget.upload!.id)
+            .update({'status': 'done', 'problemCardId': _cardId});
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Building Action Plan & Connecting Volunteers...'), duration: Duration(seconds: 2)),
+        );
+      }
+
+      // Synchronously route to Python Backend Matcher/Decomposer
+      try {
+        final backendUrl = dotenv.env['BACKEND_URL'] ?? 'https://telegram-webhook-c7dxdhg6czb6bpdt.southindia-01.azurewebsites.net';
+        final response = await http.post(
+          Uri.parse('$backendUrl/generate-tasks'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'problemCardId': _cardId,
+            'ngoId': widget.upload?.ngoId ?? widget.extraction['ngoId'],
+          }),
+        );
+        if (response.statusCode != 200) {
+          debugPrint('Flask matching sequence failed cleanly: ${response.body}');
+        }
+      } catch (e) {
+         debugPrint('Flask unreachable natively: $e');
+      }
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -166,7 +195,25 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     );
   }
 
-  Widget _buildMediaPreview(RawUpload upload) {
+  Widget _buildMediaPreview(RawUpload? upload) {
+    if (upload == null) {
+      return Container(
+        height: 120,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.mic_none_rounded, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 8),
+            Text('No Media (Direct Entry)', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+          ],
+        ),
+      );
+    }
     return Container(
       height: 240,
       width: double.infinity,
