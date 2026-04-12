@@ -6,6 +6,7 @@ import 'review_queue_screen.dart';
 import 'ngo_home_screen.dart';
 import 'ngo_impact_dashboard_screen.dart';
 import 'ngo_heatmap_screen.dart';
+import 'proof_review_screen.dart';
 
 class NgoDashboard extends StatefulWidget {
   final String ngoId;
@@ -99,7 +100,10 @@ class _NgoDashboardState extends State<NgoDashboard> {
           label: 'REVIEW',
           textColor: Colors.white,
           onPressed: () {
-            setState(() => _currentIndex = 2); // Jump to Review tab
+            messenger.clearSnackBars();
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ProofReviewScreen(ngoId: widget.ngoId))
+            );
           },
         ),
       ),

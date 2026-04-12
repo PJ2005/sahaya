@@ -3,8 +3,10 @@ import 'package:flutter/scheduler.dart';
 
 class ThemeProvider extends ChangeNotifier {
   ThemeMode _mode = ThemeMode.system;
+  bool _highContrast = false;
 
   ThemeMode get mode => _mode;
+  bool get highContrast => _highContrast;
 
   bool get isDark {
     if (_mode == ThemeMode.system) {
@@ -22,6 +24,11 @@ class ThemeProvider extends ChangeNotifier {
 
   void setMode(ThemeMode m) {
     _mode = m;
+    notifyListeners();
+  }
+
+  void toggleHighContrast() {
+    _highContrast = !_highContrast;
     notifyListeners();
   }
 }

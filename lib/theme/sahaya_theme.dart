@@ -47,7 +47,7 @@ class SahayaTheme {
   }
 
   // ━━━━━━━━━━━━━━━━ LIGHT ━━━━━━━━━━━━━━━━
-  static ThemeData light() {
+  static ThemeData light({bool highContrast = false}) {
     final base = ThemeData(brightness: Brightness.light, useMaterial3: true);
     return base.copyWith(
       scaffoldBackgroundColor: SahayaColors.lightBg,
@@ -105,15 +105,15 @@ class SahayaTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: SahayaColors.lightBorder),
+          borderSide: BorderSide(color: SahayaColors.lightBorder, width: highContrast ? 2 : 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: SahayaColors.lightBorder),
+          borderSide: BorderSide(color: SahayaColors.lightBorder, width: highContrast ? 2 : 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: SahayaColors.emerald, width: 2),
+          borderSide: BorderSide(color: SahayaColors.emerald, width: highContrast ? 3 : 2),
         ),
         labelStyle: GoogleFonts.inter(color: SahayaColors.lightMuted),
       ),
@@ -133,7 +133,7 @@ class SahayaTheme {
           return const IconThemeData(color: SahayaColors.lightMuted);
         }),
       ),
-      dividerTheme: const DividerThemeData(color: SahayaColors.lightBorder, thickness: 1),
+      dividerTheme: DividerThemeData(color: SahayaColors.lightBorder, thickness: highContrast ? 2 : 1),
       chipTheme: ChipThemeData(
         backgroundColor: SahayaColors.lightBg,
         selectedColor: SahayaColors.emeraldMuted,
@@ -149,7 +149,7 @@ class SahayaTheme {
   }
 
   // ━━━━━━━━━━━━━━━━ DARK ━━━━━━━━━━━━━━━━
-  static ThemeData dark() {
+  static ThemeData dark({bool highContrast = false}) {
     final base = ThemeData(brightness: Brightness.dark, useMaterial3: true);
     return base.copyWith(
       scaffoldBackgroundColor: SahayaColors.darkBg,
@@ -207,15 +207,15 @@ class SahayaTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: SahayaColors.darkBorder),
+          borderSide: BorderSide(color: SahayaColors.darkBorder, width: highContrast ? 2 : 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: SahayaColors.darkBorder),
+          borderSide: BorderSide(color: SahayaColors.darkBorder, width: highContrast ? 2 : 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF34D399), width: 2),
+          borderSide: BorderSide(color: const Color(0xFF34D399), width: highContrast ? 3 : 2),
         ),
         labelStyle: GoogleFonts.inter(color: SahayaColors.darkMuted),
       ),
@@ -235,7 +235,7 @@ class SahayaTheme {
           return const IconThemeData(color: SahayaColors.darkMuted);
         }),
       ),
-      dividerTheme: const DividerThemeData(color: SahayaColors.darkBorder, thickness: 1),
+      dividerTheme: DividerThemeData(color: SahayaColors.darkBorder, thickness: highContrast ? 2 : 1),
       chipTheme: ChipThemeData(
         backgroundColor: SahayaColors.darkSurface,
         selectedColor: const Color(0xFF34D399).withValues(alpha: 0.15),

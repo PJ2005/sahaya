@@ -4,7 +4,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/sahaya_theme.dart';
-import '../models/problem_card.dart';
 
 class NgoHeatmapScreen extends StatefulWidget {
   final String ngoId;

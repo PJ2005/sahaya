@@ -82,7 +82,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => ProofSubmissionSheet(matchRecordId: widget.matchRecordId),
+      builder: (_) => ProofSubmissionSheet(matchRecordId: widget.matchRecordId, task: widget.task),
     ).then((submitted) {
       if (submitted == true && mounted) {
         SuccessOverlay.show(
@@ -388,7 +388,8 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class ProofSubmissionSheet extends StatefulWidget {
   final String matchRecordId;
-  const ProofSubmissionSheet({super.key, required this.matchRecordId});
+  final TaskModel task;
+  const ProofSubmissionSheet({super.key, required this.matchRecordId, required this.task});
 
   @override
   State<ProofSubmissionSheet> createState() => _ProofSubmissionSheetState();
@@ -460,6 +461,18 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
           matchRecordId: widget.matchRecordId,
           localImagePaths: paths,
           note: _noteCtrl.text.trim(),
+        );
+
+        await OfflineProofSyncService.queueTaskUpdate(
+          matchRecordId: widget.matchRecordId,
+          taskId: widget.task.id,
+          volunteerId: '',
+          updates: {
+            'matchStatus': 'proof_submitted',
+            'taskStatus': widget.task.status.name,
+            'offlineNote': _noteCtrl.text.trim(),
+          },
+          localMergeNote: _noteCtrl.text.trim(),
         );
 
         if (mounted) {

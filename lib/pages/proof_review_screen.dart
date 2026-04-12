@@ -29,47 +29,51 @@ class ProofReviewScreen extends StatelessWidget {
             .where('ngoId', isEqualTo: ngoId)
             .snapshots(),
         builder: (context, cardsSnapshot) {
-          if (cardsSnapshot.connectionState == ConnectionState.waiting) {
+          if (cardsSnapshot.hasError) return _emptyState(context);
+          if (cardsSnapshot.connectionState == ConnectionState.waiting &&
+              !cardsSnapshot.hasData) {
             return const ListShimmer(itemCount: 6);
           }
 
-          final cardIds = cardsSnapshot.data?.docs.map((doc) => doc.id).toSet() ?? <String>{};
+          final cardIds =
+              cardsSnapshot.data?.docs.map((doc) => doc.id).toList() ??
+              <String>[];
           if (cardIds.isEmpty) return _emptyState(context);
 
           return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('tasks')
+                .where('problemCardId', whereIn: cardIds.take(30).toList())
+                .snapshots(),
             builder: (context, tasksSnapshot) {
-              if (!tasksSnapshot.hasData) return const ListShimmer(itemCount: 6);
+              if (tasksSnapshot.hasError) return _emptyState(context);
+              if (!tasksSnapshot.hasData)
+                return const ListShimmer(itemCount: 6);
 
               final taskIds = tasksSnapshot.data!.docs
-                  .where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final problemCardId = data['problemCardId'] as String? ?? '';
-                    return cardIds.contains(problemCardId);
-                  })
                   .map((doc) => doc.id)
-                  .toSet();
-
+                  .toList();
               if (taskIds.isEmpty) return _emptyState(context);
 
               return StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('match_records')
+                    .where('taskId', whereIn: taskIds.take(30).toList())
                     .where('status', isEqualTo: 'proof_submitted')
                     .snapshots(),
                 builder: (context, matchSnapshot) {
-                  if (!matchSnapshot.hasData) return const ListShimmer(itemCount: 6);
+                  if (matchSnapshot.hasError) return _emptyState(context);
+                  if (!matchSnapshot.hasData)
+                    return const ListShimmer(itemCount: 6);
 
-                  final pendingDocs = matchSnapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final taskId = data['taskId'] as String? ?? '';
-                    return taskIds.contains(taskId);
-                  }).toList();
-
+                  final pendingDocs = matchSnapshot.data!.docs;
                   if (pendingDocs.isEmpty) return _emptyState(context);
 
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     itemCount: pendingDocs.length,
                     itemBuilder: (context, index) {
                       final doc = pendingDocs[index];
@@ -120,10 +124,7 @@ class _ProofBlock extends StatefulWidget {
   final String matchRecordId;
   final Map<String, dynamic> matchData;
 
-  const _ProofBlock({
-    required this.matchRecordId,
-    required this.matchData,
-  });
+  const _ProofBlock({required this.matchRecordId, required this.matchData});
 
   @override
   State<_ProofBlock> createState() => _ProofBlockState();
@@ -143,8 +144,10 @@ class _ProofBlockState extends State<_ProofBlock> {
     if (taskId.isEmpty) return;
 
     try {
-      final taskDoc =
-          await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+      final taskDoc = await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(taskId)
+          .get();
       if (taskDoc.exists && mounted) {
         setState(() => _taskDesc = taskDoc.data()?['description'] as String?);
       }

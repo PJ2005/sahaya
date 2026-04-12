@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -283,15 +284,20 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
     }
 
     try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
       final qs = await FirebaseFirestore.instance
           .collection('ngo_notifications')
+          .where('ngoId', isEqualTo: uid)
           .where('matchRecordId', isEqualTo: widget.matchRecordId)
           .where('read', isEqualTo: false)
           .get();
       for (final doc in qs.docs) {
         await doc.reference.update({'read': true, 'handledAt': FieldValue.serverTimestamp()});
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("Failed to mark notifications handled: $e");
+    }
   }
 
   @override
@@ -671,43 +677,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
     );
   }
 
-  Widget _aiVerificationChip(BuildContext context) {
-    if (_aiVerificationLoading) {
-      return _pill(
-        context,
-        'AI Verification...',
-        Theme.of(context).colorScheme.surfaceContainerHighest,
-        Theme.of(context).colorScheme.onSurfaceVariant,
-      );
-    }
 
-    final label = _aiVerificationLabel;
-    if (label == null) return const SizedBox.shrink();
-
-    switch (label) {
-      case 'likely_genuine':
-        return _pill(
-          context,
-          'AI Verification: Likely genuine',
-          SahayaColors.emeraldMuted,
-          SahayaColors.emerald,
-        );
-      case 'unrelated':
-        return _pill(
-          context,
-          'AI Verification: Unrelated',
-          SahayaColors.coral.withValues(alpha: 0.12),
-          SahayaColors.coral,
-        );
-      default:
-        return _pill(
-          context,
-          'AI Verification: Needs clarification',
-          SahayaColors.amber.withValues(alpha: 0.12),
-          SahayaColors.amber,
-        );
-    }
-  }
 
   Widget _aiVerificationPanel(
     BuildContext context,

@@ -1,13 +1,33 @@
 import 'package:flutter/material.dart';
+import '../utils/translator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/problem_card.dart';
 import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
 import '../app.dart';
-import 'proof_review_screen.dart';
+import '../l10n/app_text.dart';
 import 'ngo_task_detail_screen.dart';
 import 'ngo_create_problem_screen.dart';
+import 'proof_review_screen.dart';
+
+String _sdgTagForIssue(IssueType issue) {
+  switch (issue) {
+    case IssueType.water_access:
+    case IssueType.sanitation:
+      return 'SDG 6';
+    case IssueType.education:
+      return 'SDG 4';
+    case IssueType.nutrition:
+      return 'SDG 2';
+    case IssueType.healthcare:
+      return 'SDG 3';
+    case IssueType.livelihood:
+      return 'SDG 8';
+    case IssueType.other:
+      return 'SDG 11';
+  }
+}
 
 class NgoHomeScreen extends StatelessWidget {
   final String ngoId;
@@ -76,10 +96,11 @@ class NgoHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppText.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Sahaya Admin',
+        title: T(
+          t.ngoAdmin,
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w800,
             fontSize: 24,
@@ -93,9 +114,44 @@ class NgoHomeScreen extends StatelessWidget {
                   ? Icons.light_mode_rounded
                   : Icons.dark_mode_rounded,
             ),
+            tooltip: t.toggleTheme,
             onPressed: () => themeProvider.toggle(),
           ),
-          _pendingProofsBadge(context),
+          IconButton(
+            icon: const Icon(Icons.fact_check_rounded),
+            tooltip: 'Proof Reviews',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => ProofReviewScreen(ngoId: ngoId)),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.translate_rounded),
+            tooltip: t.toggleLanguage,
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (ctx) {
+                  return ListView(
+                    shrinkWrap: true,
+                    children: localeProvider.supportedLanguages.map((lang) {
+                      return ListTile(
+                        leading: localeProvider.locale.languageCode == lang['code']
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : const SizedBox(width: 24),
+                        title: T(lang['name']!),
+                        onTap: () {
+                          localeProvider.setLocale(Locale(lang['code']!));
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  );
+                },
+              );
+            },
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -120,7 +176,7 @@ class NgoHomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                   child: Row(
                     children: [
-                      Text(
+                      T(
                         'ACTIVE PROBLEM CARDS',
                         style: GoogleFonts.inter(
                           fontSize: 12,
@@ -164,10 +220,11 @@ class NgoHomeScreen extends StatelessWidget {
             ),
           );
         },
+        tooltip: t.newProblem,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: Text('New Problem', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        label: T(t.newProblem, style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
       ),
     );
   }
@@ -220,14 +277,14 @@ class NgoHomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      T(
                         'Good morning,',
                         style: GoogleFonts.inter(
                           color: Colors.white60,
                           fontSize: 13,
                         ),
                       ),
-                      Text(
+                      T(
                         'NGO Coordinator',
                         style: GoogleFonts.inter(
                           color: Colors.white,
@@ -265,7 +322,7 @@ class NgoHomeScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        T(
           val,
           style: GoogleFonts.inter(
             color: Colors.white,
@@ -273,75 +330,12 @@ class NgoHomeScreen extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        Text(
+        T(
           label,
           style: GoogleFonts.inter(color: Colors.white54, fontSize: 11),
         ),
       ],
     );
-  }
-
-  Widget _pendingProofsBadge(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('problem_cards')
-          .where('ngoId', isEqualTo: ngoId)
-          .snapshots(),
-      builder: (context, cardsSnapshot) {
-        if (!cardsSnapshot.hasData) return const SizedBox.shrink();
-        final cardIds = cardsSnapshot.data!.docs.map((doc) => doc.id).toSet();
-
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance 
-              .collection('match_records')
-              .where('status', isEqualTo: 'proof_submitted')
-              .snapshots(),
-          builder: (context, matchSnapshot) {
-            if (!matchSnapshot.hasData) return const SizedBox.shrink();
-            
-            return FutureBuilder<int>(
-              future: _countMyPendingProofs(matchSnapshot.data!.docs, cardIds),
-              builder: (context, countSnapshot) {
-                final count = countSnapshot.data ?? 0;
-                return IconButton(
-                  icon: Badge(
-                    isLabelVisible: count > 0,
-                    label: Text('$count', style: const TextStyle(fontSize: 10)),
-                    child: const Icon(Icons.fact_check_outlined),
-                  ),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProofReviewScreen(ngoId: ngoId),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<int> _countMyPendingProofs(List<QueryDocumentSnapshot> matchDocs, Set<String> myCardIds) async {
-    if (matchDocs.isEmpty) return 0;
-    int count = 0;
-    for (final mDoc in matchDocs) {
-      final mData = mDoc.data() as Map<String, dynamic>;
-      final taskId = mData['taskId'] as String? ?? '';
-      if (taskId.isEmpty) continue;
-      
-      final tDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
-      if (tDoc.exists) {
-        final tData = tDoc.data() as Map<String, dynamic>;
-        final problemCardId = tData['problemCardId'] as String? ?? '';
-        if (myCardIds.contains(problemCardId)) {
-          count++;
-        }
-      }
-    }
-    return count;
   }
 
   Widget _emptyState(BuildContext context) {
@@ -355,7 +349,7 @@ class NgoHomeScreen extends StatelessWidget {
             color: Theme.of(context).colorScheme.outlineVariant,
           ),
           const SizedBox(height: 16),
-          Text(
+          T(
             'No approved cards yet',
             style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
@@ -363,7 +357,7 @@ class NgoHomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          T(
             'Approve cards from the Review Queue',
             style: GoogleFonts.inter(
               fontSize: 13,
@@ -392,7 +386,7 @@ class NgoHomeScreen extends StatelessWidget {
         children: [
           Icon(Icons.auto_awesome_rounded, color: cs.primary),
           const SizedBox(height: 10),
-          Text(
+          T(
             'Try the AI assistant — describe any change in plain English.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
@@ -405,12 +399,12 @@ class NgoHomeScreen extends StatelessWidget {
           TextButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
+                content: T(
                   'Open a Review Queue item and tap AI Assistant to describe edits in plain English.',
                 ),
               ),
             ),
-            child: const Text('Open AI Assistant'),
+            child: T('Open AI Assistant'),
           ),
         ],
       ),
@@ -471,8 +465,15 @@ class NgoTaskBlock extends StatelessWidget {
                   cs.primary.withValues(alpha: 0.1),
                   cs.primary,
                 ),
+                const SizedBox(width: 8),
+                _miniPill(
+                  context,
+                  _sdgTagForIssue(card.issueType),
+                  const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                  const Color(0xFF0369A1),
+                ),
                 const Spacer(),
-                Text(
+                T(
                   'PRIORITY ${card.priorityScore.toInt()}',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w900,
@@ -484,7 +485,7 @@ class NgoTaskBlock extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Text(
+            T(
               card.description,
               style: GoogleFonts.inter(
                 fontSize: 15,
@@ -504,7 +505,7 @@ class NgoTaskBlock extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
+                  child: T(
                     '${card.locationWard}, ${card.locationCity}',
                     style: GoogleFonts.inter(
                       fontSize: 12,
@@ -519,7 +520,7 @@ class NgoTaskBlock extends StatelessWidget {
                   color: cs.onSurfaceVariant,
                 ),
                 const SizedBox(width: 4),
-                Text(
+                T(
                   '${card.affectedCount}',
                   style: GoogleFonts.inter(
                     fontSize: 12,
@@ -542,7 +543,7 @@ class NgoTaskBlock extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
+      child: T(
         text,
         style: GoogleFonts.inter(
           fontSize: 10,

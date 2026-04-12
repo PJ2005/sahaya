@@ -7,10 +7,42 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid != null;
     }
 
+    function ngoIdByCard(cardId) {
+      return get(/databases/$(database)/documents/problem_cards/$(cardId)).data.ngoId;
+    }
+
+    function ngoIdByTask(taskId) {
+      return ngoIdByCard(get(/databases/$(database)/documents/tasks/$(taskId)).data.problemCardId);
+    }
+
+    function isTaskNgoOwner() {
+      return isAuthenticated() && request.auth.uid == ngoIdByCard(resource.data.problemCardId);
+    }
+
+    function isTaskNgoOwnerOnCreate() {
+      return isAuthenticated() && request.auth.uid == ngoIdByCard(request.resource.data.problemCardId);
+    }
+
+    function isVolunteerSelfClaim() {
+      return isAuthenticated() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['assignedVolunteerIds']) &&
+        request.resource.data.assignedVolunteerIds.hasAll(resource.data.assignedVolunteerIds) &&
+        request.resource.data.assignedVolunteerIds.size() <= resource.data.assignedVolunteerIds.size() + 1 &&
+        request.auth.uid in request.resource.data.assignedVolunteerIds;
+    }
+
+    function isNgoForMatch() {
+      return isAuthenticated() && request.auth.uid == ngoIdByTask(resource.data.taskId);
+    }
+
+    function isVolunteerForMatch() {
+      return isAuthenticated() && request.auth.uid == resource.data.volunteerId;
+    }
+
     match /users/{userId} {
       // Basic rule for the user schema we created earlier
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
     }
 
     match /problem_cards/{cardId} {
@@ -20,7 +52,10 @@ service cloud.firestore {
     }
 
     match /tasks/{taskId} {
-      allow read, update, create, delete: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow create: if isTaskNgoOwnerOnCreate();
+      allow update: if isTaskNgoOwner() || isVolunteerSelfClaim();
+      allow delete: if isTaskNgoOwner();
     }
     match /ngo_profiles/{profileId} {
       allow read, update, delete: if isAuthenticated();
@@ -32,12 +67,10 @@ service cloud.firestore {
     }
 
     match /match_records/{matchId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
-        request.auth.uid == resource.data.volunteerId ||
-        request.auth.uid == get(/databases/$(database)/documents/problem_cards/$(get(/databases/$(database)/documents/tasks/$(resource.data.taskId)).data.problemCardId)).data.ngoId
-      );
+      allow read: if isVolunteerForMatch() || isNgoForMatch();
+      allow create: if false;
+      allow update: if isVolunteerForMatch() || isNgoForMatch();
+      allow delete: if isNgoForMatch();
     }
     
     match /raw_uploads/{uploadId} {
@@ -52,7 +85,7 @@ service cloud.firestore {
 
     match /ngo_notifications/{notificationId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
-      allow create: if isAuthenticated(); // Backend or Telegram bot can create
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
     }
   }
 }

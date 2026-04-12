@@ -13,6 +13,7 @@ import '../services/gemini_service.dart';
 import 'package:uuid/uuid.dart';
 import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
+import '../utils/translator.dart';
 
 class UploadScreen extends StatefulWidget {
   final String ngoId;
@@ -181,7 +182,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Smart Ingestion', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+        title: T('Smart Ingestion', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
         centerTitle: true,
       ),
       body: Column(
@@ -209,8 +210,8 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
               tabs: const [
-                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.upload_file, size: 16), SizedBox(width: 8), Text('Direct Upload')])),
-                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.telegram, size: 16), SizedBox(width: 8), Text('Telegram Sync')])),
+                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.upload_file, size: 16), SizedBox(width: 8), T('Direct Upload')])),
+                Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.telegram, size: 16), SizedBox(width: 8), T('Telegram Sync')])),
               ],
             ),
           ),
@@ -239,7 +240,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   decoration: const BoxDecoration(color: SahayaColors.emerald, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 10),
-                Text('LIVE SYNC FEED', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: cs.primary, letterSpacing: 1)),
+                T('LIVE SYNC FEED', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: cs.primary, letterSpacing: 1)),
               ],
             ),
           ),
@@ -279,10 +280,10 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   else
                     Icon(Icons.cloud_upload_rounded, size: 64, color: cs.primary),
                   const SizedBox(height: 20),
-                  Text(_isUploading ? 'Uploading to cloud...' : 'Press to select files', 
+                  T(_isUploading ? 'Uploading to cloud...' : 'Press to select files', 
                     style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
-                  Text('PDF, TXT, audio notes, CSV, DOCX or images', 
+                  T('PDF, TXT, audio notes, CSV, DOCX or images', 
                     style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
                 ],
               ),
@@ -345,14 +346,14 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                   child: ElevatedButton.icon(
                     onPressed: _isUploading ? null : _uploadPastedText,
                     icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Upload pasted text for Gemini'),
+                    label: const T('Upload pasted text for Gemini'),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          Text(
+          T(
             'Files, pasted notes, and voice recordings uploaded here are automatically processed by Sahaya AI to extract problem reports, severity levels, and locations.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant, height: 1.5),

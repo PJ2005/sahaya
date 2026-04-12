@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../utils/translator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/volunteer_profile.dart';
 import '../../models/task_model.dart';
 import '../../theme/sahaya_theme.dart';
 import '../../app.dart';
+import '../../l10n/app_text.dart';
 import 'task_details_screen.dart';
 import 'active_task_screen.dart';
 import '../../services/offline_proof_sync_service.dart';
@@ -64,7 +66,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Availability updated!'),
+            content: T('Availability updated!'),
             backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
@@ -73,7 +75,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: T('Failed: $e'),
             backgroundColor: SahayaColors.coral,
           ),
         );
@@ -83,13 +85,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = AppText.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Sahaya',
+        title: T(
+          t.appName,
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w800,
             fontSize: 24,
@@ -101,7 +103,34 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             ),
+            tooltip: t.toggleTheme,
             onPressed: () => themeProvider.toggle(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.translate_rounded),
+            tooltip: t.toggleLanguage,
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (ctx) {
+                  return ListView(
+                    shrinkWrap: true,
+                    children: localeProvider.supportedLanguages.map((lang) {
+                      return ListTile(
+                        leading: localeProvider.locale.languageCode == lang['code']
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : const SizedBox(width: 24),
+                        title: T(lang['name']!),
+                        onTap: () {
+                          localeProvider.setLocale(Locale(lang['code']!));
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  );
+                },
+              );
+            },
           ),
           const SizedBox(width: 4),
         ],
@@ -127,7 +156,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           if (snapshot.hasError ||
               !snapshot.hasData ||
               !snapshot.data!.exists) {
-            return const Center(child: Text('Profile not found.'));
+            return const Center(child: T('Profile not found.'));
           }
 
           final profileMap = snapshot.data!.data() as Map<String, dynamic>;
@@ -182,7 +211,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text(
+                    T(
                       'Available this\nweekend?',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
@@ -194,7 +223,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
+                    T(
                       'Help your community — we\'ll match you with\nnearby tasks based on your skills.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
@@ -215,7 +244,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () => _updateAvailability(true, false),
-                          child: const Text('Yes, I\'m available'),
+                          child: T('Yes, I\'m available'),
                         ),
                       ),
                     ),
@@ -227,7 +256,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       height: 56,
                       child: OutlinedButton(
                         onPressed: () => _updateAvailability(true, true),
-                        child: const Text('Partially — a few hours'),
+                        child: T('Partially — a few hours'),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -243,7 +272,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                               ? SahayaColors.darkMuted
                               : SahayaColors.lightMuted,
                         ),
-                        child: const Text('Not this time'),
+                        child: T('Not this time'),
                       ),
                     ),
                   ],
@@ -292,7 +321,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                           children: [
                             Icon(Icons.workspace_premium_rounded, color: SahayaColors.coral, size: 22),
                             const SizedBox(width: 8),
-                            Text(
+                            T(
                               profile.trustScore > 100 ? 'Community Leader' : (profile.tasksCompleted >= 5 ? 'Verified' : 'Novice'),
                               style: GoogleFonts.inter(
                                 color: SahayaColors.coral,
@@ -303,7 +332,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        T(
                           'You\'re checked in',
                           style: GoogleFonts.inter(
                             color: Colors.white,
@@ -312,7 +341,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
+                        T(
                           '${profile.tasksCompleted} Missions • ${profile.trustScore} XP',
                           style: GoogleFonts.inter(
                             color: Colors.white70,
@@ -336,7 +365,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                       children: [
                         Icon(Icons.circle, size: 8, color: cs.primary),
                         const SizedBox(width: 6),
-                        Text(
+                        T(
                           profile.isPartialAvailability ? 'Partial' : 'Active',
                           style: GoogleFonts.inter(
                             color: cs.primary,
@@ -386,9 +415,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
               tabs: const [
-                Tab(child: Text('Available')),
+                Tab(child: T('Available')),
                 Tab(child: _MarqueeText(text: 'My Missions')),
-                Tab(child: Text('History')),
+                Tab(child: T('History')),
               ],
             ),
           ),
@@ -403,7 +432,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                   .snapshots(),
               builder: (context, matchSnapshot) {
                 if (matchSnapshot.hasError) {
-                  return Center(child: Text('Error: ${matchSnapshot.error}'));
+                  return Center(child: T('Error: ${matchSnapshot.error}'));
                 }
                 if (matchSnapshot.connectionState == ConnectionState.waiting) {
                   return ListView.builder(
@@ -493,7 +522,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             color: isDark ? SahayaColors.darkBorder : const Color(0xFFD1D5DB),
           ),
           const SizedBox(height: 16),
-          Text(
+          T(
             title,
             style: GoogleFonts.inter(
               fontSize: 17,
@@ -502,7 +531,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          T(
             subtitle,
             style: GoogleFonts.inter(
               fontSize: 14,
@@ -653,7 +682,7 @@ class _TaskCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      T(
                         desc,
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
@@ -664,7 +693,7 @@ class _TaskCard extends StatelessWidget {
                       ),
                       if (isHistory && impactStatement.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(
+                        T(
                           impactStatement,
                           style: GoogleFonts.inter(
                             fontSize: 12,
@@ -690,7 +719,7 @@ class _TaskCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 3),
                             Flexible(
-                              child: Text(
+                              child: T(
                                 ward,
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
@@ -734,7 +763,7 @@ class _TaskCard extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
+      child: T(
         text,
         style: GoogleFonts.inter(
           fontSize: 11,
@@ -859,8 +888,7 @@ class _TaskCard extends StatelessWidget {
 
 class _MarqueeText extends StatefulWidget {
   final String text;
-  final TextStyle? style;
-  const _MarqueeText({required this.text, this.style});
+  const _MarqueeText({required this.text});
 
   @override
   State<_MarqueeText> createState() => _MarqueeTextState();
@@ -892,7 +920,7 @@ class _MarqueeTextState extends State<_MarqueeText>
   }
 
   TextStyle get _style =>
-      widget.style ?? GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13);
+      GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13);
 
   @override
   void dispose() {
@@ -920,9 +948,9 @@ class _MarqueeTextState extends State<_MarqueeText>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(widget.text, style: _style, maxLines: 1),
+                  T(widget.text, style: _style, maxLines: 1),
                   const SizedBox(width: _gap),
-                  Text(widget.text, style: _style, maxLines: 1),
+                  T(widget.text, style: _style, maxLines: 1),
                 ],
               ),
             ),

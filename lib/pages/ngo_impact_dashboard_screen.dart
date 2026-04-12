@@ -2,8 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../components/list_shimmer.dart';
 import '../theme/sahaya_theme.dart';
+import '../l10n/app_text.dart';
 
 class NgoImpactDashboardScreen extends StatefulWidget {
   final String ngoId;
@@ -15,7 +19,14 @@ class NgoImpactDashboardScreen extends StatefulWidget {
 
 class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
   int _daysWindow = 30;
+  double _shortagePercent = 20;
+  double _surgePercent = 30;
+  double _horizonDays = 7;
+  bool _simLoading = false;
+  Map<String, dynamic>? _simResult;
   final Map<String, DateTime?> _uploadedAtCache = <String, DateTime?>{};
+  List<QueryDocumentSnapshot> _lastCards = <QueryDocumentSnapshot>[];
+  List<QueryDocumentSnapshot> _lastMatches = <QueryDocumentSnapshot>[];
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +79,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                     final tasks = dataSnapshot.data!['tasks']!;
                     final matches = dataSnapshot.data!['matches']!;
 
+                    _lastCards = cards;
+                    _lastMatches = matches;
+
                     return FutureBuilder<_ImpactMetrics>(
                       future: _computeMetrics(
                         cards,
@@ -87,6 +101,10 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
                             _buildKpiGrid(metrics),
                             const SizedBox(height: 24),
                             _buildImpactCard(context, metrics, cs, isDark),
+                            const SizedBox(height: 20),
+                            _buildIncidentQueueCard(context),
+                            const SizedBox(height: 20),
+                            _buildScenarioSimulatorCard(context),
                             const SizedBox(height: 20),
                           ],
                         );
@@ -124,9 +142,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _KpiCard(title: 'TIME TO FIRST TASK', value: '${metrics.avgHoursToFirstTask.toStringAsFixed(1)}h', subtitle: 'Ingestion delay', icon: Icons.speed_rounded, color: SahayaColors.emerald)),
+            Expanded(child: _KpiCard(title: 'TIME TO FIRST TASK', value: '${metrics.avgHoursToFirstTask.toStringAsFixed(1)}h', subtitle: 'Ingestion delay', icon: Icons.speed_rounded, color: SahayaColors.emerald, onTap: () => _openKpiDrilldown('time_to_first_task'))),
             const SizedBox(width: 12),
-            Expanded(child: _KpiCard(title: 'PRIORITY COVERED', value: '${metrics.priorityCoveragePercent.toStringAsFixed(0)}%', subtitle: 'Critical needs', icon: Icons.priority_high_rounded, color: SahayaColors.amber)),
+            Expanded(child: _KpiCard(title: 'PRIORITY COVERED', value: '${metrics.priorityCoveragePercent.toStringAsFixed(0)}%', subtitle: 'Critical needs', icon: Icons.priority_high_rounded, color: SahayaColors.amber, onTap: () => _openKpiDrilldown('priority_covered'))),
           ],
         ),
         const SizedBox(height: 12),
@@ -137,7 +155,160 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
           icon: Icons.check_circle_outline_rounded, 
           color: const Color(0xFF6366F1), 
           isWide: true,
+          onTap: () => _openKpiDrilldown('completion_rate'),
         ),
+      ],
+    );
+  }
+
+  Widget _buildIncidentQueueCard(BuildContext context) {
+    final t = AppText.of(context);
+    final cs = Theme.of(context).colorScheme;
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _loadIncidentQueue(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+              boxShadow: [sahayaCardShadow(context)],
+            ),
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final incidents = snapshot.data!;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            boxShadow: [sahayaCardShadow(context)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: SahayaColors.coral),
+                  const SizedBox(width: 8),
+                  Text(t.incidentQueue, style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (incidents.isEmpty)
+                Text('No stale accepted tasks right now.', style: GoogleFonts.inter(color: cs.onSurfaceVariant))
+              else
+                ...incidents.take(4).map((it) => Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(it['taskDescription'] ?? 'Task', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Text('Stale ${it['hoursStale']}h • ${it['sdgTag']}', style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _redispatchTask(it['taskId'] as String),
+                          icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                          label: const Text('Redispatch'),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildScenarioSimulatorCard(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final projection = _simResult?['projection'] as Map<String, dynamic>?;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [sahayaCardShadow(context)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.science_outlined, color: Color(0xFF6366F1)),
+              const SizedBox(width: 8),
+              Text('SCENARIO SIMULATOR', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildSliderRow('Volunteer shortage', _shortagePercent, 0, 70, '%', (v) => setState(() => _shortagePercent = v)),
+          _buildSliderRow('Demand surge', _surgePercent, 0, 200, '%', (v) => setState(() => _surgePercent = v)),
+          _buildSliderRow('Horizon', _horizonDays, 1, 30, 'days', (v) => setState(() => _horizonDays = v)),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _simLoading ? null : _runScenarioSimulation,
+              icon: _simLoading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.play_arrow_rounded, size: 18),
+              label: Text(_simLoading ? 'Running...' : 'Run Simulation'),
+            ),
+          ),
+          if (projection != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Coverage ${projection['projectedCoveragePercent']}% • Backlog ${projection['expectedBacklogSlots']} slots',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Delay ${projection['expectedDelayHours']}h • Risk ${projection['riskLevel']}',
+              style: GoogleFonts.inter(color: cs.onSurfaceVariant, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderRow(
+    String label,
+    double value,
+    double min,
+    double max,
+    String unit,
+    ValueChanged<double> onChanged,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12)),
+            const Spacer(),
+            Text('${value.toStringAsFixed(0)}$unit', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12, color: cs.onSurfaceVariant)),
+          ],
+        ),
+        Slider(value: value, min: min, max: max, divisions: (max - min).toInt(), onChanged: onChanged),
       ],
     );
   }
@@ -431,6 +602,198 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       return null;
     }
   }
+
+  String _sdgTagForIssue(String issue) {
+    switch (issue.trim()) {
+      case 'water_access':
+      case 'sanitation':
+        return 'SDG 6';
+      case 'education':
+        return 'SDG 4';
+      case 'nutrition':
+        return 'SDG 2';
+      case 'healthcare':
+        return 'SDG 3';
+      case 'livelihood':
+        return 'SDG 8';
+      default:
+        return 'SDG 11';
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadIncidentQueue() async {
+    final acceptedSnapshot = await FirebaseFirestore.instance
+        .collection('match_records')
+        .where('status', isEqualTo: 'accepted')
+        .get();
+
+    final now = DateTime.now();
+    final incidents = <Map<String, dynamic>>[];
+
+    for (final doc in acceptedSnapshot.docs) {
+      final data = doc.data();
+      final createdAt = _asDate(data['createdAt']);
+      if (createdAt == null) continue;
+      final hours = now.difference(createdAt).inHours;
+      if (hours < 8) continue;
+
+      final taskId = data['taskId'] as String? ?? '';
+      if (taskId.isEmpty) continue;
+
+      final taskDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+      if (!taskDoc.exists) continue;
+      final taskData = taskDoc.data() as Map<String, dynamic>;
+      final cardId = taskData['problemCardId'] as String? ?? '';
+      if (cardId.isEmpty) continue;
+
+      final cardDoc = await FirebaseFirestore.instance.collection('problem_cards').doc(cardId).get();
+      if (!cardDoc.exists) continue;
+      final cardData = cardDoc.data() as Map<String, dynamic>;
+      if ((cardData['ngoId'] as String?) != widget.ngoId) continue;
+
+      final issue = (cardData['issueType'] as String?) ?? 'other';
+      incidents.add({
+        'matchId': doc.id,
+        'taskId': taskId,
+        'taskDescription': (taskData['description'] as String?) ?? 'Task',
+        'hoursStale': hours,
+        'sdgTag': _sdgTagForIssue(issue),
+      });
+    }
+
+    incidents.sort((a, b) => (b['hoursStale'] as int).compareTo(a['hoursStale'] as int));
+    return incidents;
+  }
+
+  Future<void> _redispatchTask(String taskId) async {
+    final backendUrl = dotenv.env['BACKEND_URL'] ?? 'https://sahaya-faas-puz67as73a-uc.a.run.app';
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$backendUrl/redispatch-task'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'taskId': taskId, 'reason': 'ngo_incident_queue', 'staleHours': 8}),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Redispatch triggered.'), backgroundColor: SahayaColors.emerald));
+        setState(() {});
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Redispatch failed: ${response.statusCode}'), backgroundColor: SahayaColors.coral));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Redispatch error: $e'), backgroundColor: SahayaColors.coral));
+    }
+  }
+
+  Future<void> _runScenarioSimulation() async {
+    final backendUrl = dotenv.env['BACKEND_URL'] ?? 'https://sahaya-faas-puz67as73a-uc.a.run.app';
+    setState(() => _simLoading = true);
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$backendUrl/simulate-scenario'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'ngoId': widget.ngoId,
+              'shortagePercent': _shortagePercent,
+              'surgePercent': _surgePercent,
+              'horizonDays': _horizonDays.round(),
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      if (!mounted) return;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        setState(() {
+          _simResult = body['result'] as Map<String, dynamic>?;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Simulation failed: ${response.statusCode}'),
+            backgroundColor: SahayaColors.coral,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Simulation error: $e'), backgroundColor: SahayaColors.coral),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _simLoading = false);
+    }
+  }
+
+  void _openKpiDrilldown(String kind) {
+    if (_lastCards.isEmpty) return;
+
+    final cs = Theme.of(context).colorScheme;
+    final lines = <String>[];
+
+    if (kind == 'time_to_first_task') {
+      for (final c in _lastCards.take(12)) {
+        final d = c.data() as Map<String, dynamic>;
+        lines.add('${d['locationWard'] ?? 'Ward'} • P${((d['priorityScore'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}');
+      }
+    } else if (kind == 'priority_covered') {
+      final highCards = _lastCards.where((c) {
+        final d = c.data() as Map<String, dynamic>;
+        return ((d['priorityScore'] as num?)?.toDouble() ?? 0) > 70;
+      }).toList();
+      lines.add('High-priority cards: ${highCards.length}');
+      for (final c in highCards.take(10)) {
+        final d = c.data() as Map<String, dynamic>;
+        final issue = (d['issueType'] as String?) ?? 'other';
+        lines.add('${d['locationWard'] ?? 'Ward'} • ${_sdgTagForIssue(issue)}');
+      }
+    } else {
+      final accepted = _lastMatches.where((m) {
+        final d = m.data() as Map<String, dynamic>;
+        final s = (d['status'] as String?) ?? '';
+        return {'accepted', 'proof_submitted', 'proof_rejected', 'proof_approved'}.contains(s);
+      }).length;
+      final approved = _lastMatches.where((m) {
+        final d = m.data() as Map<String, dynamic>;
+        return (d['status'] as String?) == 'proof_approved';
+      }).length;
+      lines.add('Accepted window matches: $accepted');
+      lines.add('Approved matches: $approved');
+      final pct = accepted == 0 ? 0 : ((approved / accepted) * 100).toStringAsFixed(1);
+      lines.add('Completion rate: $pct%');
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('KPI Drilldown', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
+            const SizedBox(height: 10),
+            ...lines.map((l) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('• $l', style: GoogleFonts.inter(fontSize: 13)),
+            )),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _KpiCard extends StatelessWidget {
@@ -440,42 +803,47 @@ class _KpiCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final bool isWide;
+  final VoidCallback? onTap;
 
-  const _KpiCard({required this.title, required this.value, required this.subtitle, required this.icon, required this.color, this.isWide = false});
+  const _KpiCard({required this.title, required this.value, required this.subtitle, required this.icon, required this.color, this.isWide = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-        boxShadow: [sahayaCardShadow(context)],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.8)),
-                const SizedBox(height: 12),
-                Text(value, style: GoogleFonts.inter(fontSize: 28, color: color, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 6),
-                Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500, height: 1.3)),
-              ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+          boxShadow: [sahayaCardShadow(context)],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w900, color: cs.onSurfaceVariant, letterSpacing: 0.8)),
+                  const SizedBox(height: 12),
+                  Text(value, style: GoogleFonts.inter(fontSize: 28, color: color, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500, height: 1.3)),
+                ],
+              ),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
-            child: Icon(icon, color: color, size: 22),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
+              child: Icon(icon, color: color, size: 22),
+            ),
+          ],
+        ),
       ),
     );
   }

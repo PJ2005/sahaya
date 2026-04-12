@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'flavors.dart';
@@ -10,9 +11,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'components/offline_banner_wrapper.dart';
 import 'theme/sahaya_theme.dart';
 import 'theme/theme_provider.dart';
+import 'theme/locale_provider.dart';
+import 'l10n/app_text.dart';
 
 // Global theme provider so any screen can toggle dark mode
 final themeProvider = ThemeProvider();
+final localeProvider = LocaleProvider();
 
 class AuthGateway extends StatefulWidget {
   const AuthGateway({super.key});
@@ -199,9 +203,19 @@ class _AppState extends State<App> {
   @override
   void initState() {
     super.initState();
-    themeProvider.addListener(() {
-      if (mounted) setState(() {});
-    });
+    themeProvider.addListener(_onProviderChanged);
+    localeProvider.addListener(_onProviderChanged);
+  }
+
+  void _onProviderChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    themeProvider.removeListener(_onProviderChanged);
+    localeProvider.removeListener(_onProviderChanged);
+    super.dispose();
   }
 
   @override
@@ -213,9 +227,17 @@ class _AppState extends State<App> {
     return MaterialApp(
       title: F.title,
       debugShowCheckedModeBanner: false,
-      theme: SahayaTheme.light(),
-      darkTheme: SahayaTheme.dark(),
+      theme: SahayaTheme.light(highContrast: themeProvider.highContrast),
+      darkTheme: SahayaTheme.dark(highContrast: themeProvider.highContrast),
       themeMode: themeProvider.mode,
+      locale: localeProvider.locale,
+      supportedLocales: AppText.supportedLocales,
+      localizationsDelegates: const [
+        AppText.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: OfflineBannerWrapper(
         child: _flavorBanner(child: initialScreen, show: kDebugMode),
       ),

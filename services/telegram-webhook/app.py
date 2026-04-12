@@ -9,6 +9,7 @@ from firebase_admin import credentials, firestore, messaging
 import uuid
 import json
 import math
+import hashlib
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from google import genai
@@ -72,6 +73,12 @@ else:
 # ── Flask app ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
+ALLOWED_ISSUE_TYPES = {
+    'water_access', 'sanitation', 'education', 'nutrition',
+    'healthcare', 'livelihood', 'other'
+}
+ALLOWED_SEVERITY = {'low', 'medium', 'high', 'critical'}
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -116,6 +123,126 @@ def gemini_generate(prompt):
     except Exception as e:
         print(f"Gemini call failed: {e}")
         return None
+
+
+def _safe_int(value, default=0, min_value=0, max_value=100000):
+    try:
+        n = int(value)
+    except Exception:
+        n = default
+    return max(min_value, min(n, max_value))
+
+
+def _safe_float(value, default=0.0, min_value=0.0, max_value=100000.0):
+    try:
+        n = float(value)
+    except Exception:
+        n = default
+    return max(min_value, min(n, max_value))
+
+
+def _norm_text(value):
+    if value is None:
+        return ''
+    return re.sub(r'\s+', ' ', str(value).strip().lower())
+
+
+def _fingerprint(*parts):
+    joined = '||'.join(_norm_text(p) for p in parts)
+    return hashlib.sha256(joined.encode('utf-8')).hexdigest()[:24]
+
+
+def _log_quality_event(event_type, severity='info', ngo_id=None, related=None, flags=None, details=None):
+    if not db:
+        return
+    try:
+        event_id = str(uuid.uuid4())
+        db.collection('quality_events').document(event_id).set({
+            'id': event_id,
+            'eventType': event_type,
+            'severity': severity,
+            'ngoId': ngo_id,
+            'related': related or {},
+            'flags': flags or [],
+            'details': details or {},
+            'createdAt': firestore.SERVER_TIMESTAMP,
+        })
+    except Exception as e:
+        print(f"quality event log failed: {e}")
+
+
+def _check_recent_text_duplicate(ngo_id, upload_fingerprint, hours=48):
+    if not db or not upload_fingerprint:
+        return False
+    try:
+        threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
+        candidates = db.collection('raw_uploads') \
+            .where('ngoId', '==', ngo_id) \
+            .where('uploadFingerprint', '==', upload_fingerprint) \
+            .stream()
+        for doc in candidates:
+            d = doc.to_dict() or {}
+            ts = d.get('uploadedAt')
+            if ts and hasattr(ts, 'replace'):
+                t = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
+                if t >= threshold:
+                    return True
+        return False
+    except Exception as e:
+        print(f"duplicate check failed: {e}")
+        return False
+
+
+def _check_problem_duplicate(problem_card_id, ngo_id, issue_type, ward, city, description):
+    if not db:
+        return False, ''
+    fp = _fingerprint(issue_type, ward, city, description)
+    try:
+        candidates = db.collection('problem_cards') \
+            .where('ngoId', '==', ngo_id) \
+            .where('dupFingerprint', '==', fp) \
+            .limit(5) \
+            .stream()
+        for doc in candidates:
+            if doc.id != problem_card_id:
+                return True, fp
+        return False, fp
+    except Exception as e:
+        print(f"problem duplicate check failed: {e}")
+        return False, fp
+
+
+def _to_utc(value):
+    if not value or not hasattr(value, 'replace'):
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _estimate_travel_minutes(distance_km):
+    # baseline ETA for dispatch ordering only
+    speed_kmh = 25.0
+    return max(3, int(round((max(distance_km, 0.0) / speed_kmh) * 60)))
+
+
+def _log_sync_conflict(match_record_id, task_id, volunteer_id, local_note, reason, action_id=None):
+    if not db:
+        return
+    try:
+        conflict_id = str(uuid.uuid4())
+        db.collection('sync_conflicts').document(conflict_id).set({
+            'id': conflict_id,
+            'actionId': action_id,
+            'matchRecordId': match_record_id,
+            'taskId': task_id,
+            'volunteerId': volunteer_id,
+            'reason': reason,
+            'localMergeNote': local_note,
+            'policy': 'server_wins',
+            'status': 'logged',
+            'createdAt': firestore.SERVER_TIMESTAMP,
+        })
+    except Exception as e:
+        print(f"sync conflict log failed: {e}")
 
 
 def generate_impact_statement(task_description, issue_type, affected_count, location_ward):
@@ -167,19 +294,36 @@ def create_text_upload(text_content, ngo_id):
             public_id=public_id, filename_override="survey_notes.txt",
         )
 
+    norm_text = _norm_text(text_content)
+    upload_fp = _fingerprint(ngo_id, 'text', norm_text)
+    quality_flags = []
+    if len(norm_text) < 20:
+        quality_flags.append('too_short_text')
+    if _check_recent_text_duplicate(ngo_id, upload_fp):
+        quality_flags.append('possible_duplicate_upload')
+        _log_quality_event(
+            event_type='duplicate_upload_detected',
+            severity='medium',
+            ngo_id=ngo_id,
+            flags=quality_flags,
+            details={'uploadFingerprint': upload_fp},
+        )
+
     doc_id = str(uuid.uuid4())
     db.collection('raw_uploads').document(doc_id).set({
         'id': doc_id, 'ngoId': ngo_id,
         'cloudinaryUrl': upload_result.get('secure_url'),
         'cloudinaryPublicId': upload_result.get('public_id'),
         'fileType': 'text',
+        'uploadFingerprint': upload_fp,
+        'qualityFlags': quality_flags,
         'uploadedAt': firestore.SERVER_TIMESTAMP,
         'status': 'pending',
     })
     return doc_id
 
 
-def _run_matching_internal(task_id):
+def _run_matching_internal(task_id, exclude_volunteer_ids=None, redispatch_reason=None):
     """Core matching logic — callable without HTTP context."""
     if not db:
         return {'error': 'Firestore not connected'}, 500
@@ -188,7 +332,31 @@ def _run_matching_internal(task_id):
     if not task_doc.exists:
         return {'error': 'Task not found'}, 404
     task_data = task_doc.to_dict()
+    if task_data.get('status') not in (None, 'open'):
+        return {'status': 'skipped', 'reason': 'Task is not open'}, 200
+
+    excluded_ids = set(exclude_volunteer_ids or [])
+    try:
+        existing_matches = db.collection('match_records').where('taskId', '==', task_id).stream()
+        for m in existing_matches:
+            md = m.to_dict() or {}
+            vid = md.get('volunteerId')
+            st = _norm_text(md.get('status'))
+            if vid and st in ('open', 'accepted', 'proof_submitted', 'proof_approved'):
+                excluded_ids.add(vid)
+    except Exception as e:
+        print(f"existing match scan failed: {e}")
+
     task_skills = task_data.get('skillTags', [])
+    required_language = _norm_text(task_data.get('languagePref') or task_data.get('preferredLanguage') or '')
+    min_trust_score = _safe_int(task_data.get('minTrustScore', 0), default=0, min_value=0, max_value=1000)
+    requires_verified = bool(task_data.get('requiresVerifiedVolunteer', False))
+    safety_level = _norm_text(task_data.get('safetyLevel', 'normal'))
+
+    if safety_level in ('high', 'critical'):
+        min_trust_score = max(min_trust_score, 40)
+    if requires_verified:
+        min_trust_score = max(min_trust_score, 50)
 
     pc_id = task_data.get('problemCardId')
     pc_doc = db.collection('problem_cards').document(pc_id).get()
@@ -201,28 +369,83 @@ def _run_matching_internal(task_id):
 
     volunteers_query = db.collection('volunteer_profiles').where('availabilityWindowActive', '==', True).stream()
     matches = []
+    filtered_language = 0
+    filtered_trust = 0
+    filtered_radius = 0
+
     for v_doc in volunteers_query:
+        if v_doc.id in excluded_ids:
+            continue
+
         v_data = v_doc.to_dict()
         v_geo = v_data.get('locationGeoPoint')
         if not v_geo:
             continue
+
+        trust_score = _safe_int(v_data.get('trustScore', 0), default=0, min_value=0, max_value=1000)
+        if trust_score < min_trust_score:
+            filtered_trust += 1
+            continue
+
         radius_km = float(v_data.get('radiusKm', 10.0))
         dist_km = haversine(v_geo.latitude, v_geo.longitude, pc_lat, pc_lon)
         if dist_km > radius_km + 5.0:
+            filtered_radius += 1
             continue
+
         normalized_distance = min(dist_km / max(radius_km, 1.0), 1.0)
         v_skills = v_data.get('skillTags', [])
         overlap = len(set(v_skills).intersection(set(task_skills)))
         is_partial = bool(v_data.get('isPartialAvailability', False))
         window_active = bool(v_data.get('availabilityWindowActive', False))
+
+        volunteer_language = _norm_text(v_data.get('languagePref', ''))
+        language_match = 1.0 if (not required_language or volunteer_language == required_language) else 0.0
+        if required_language and language_match < 1.0:
+            filtered_language += 1
+            continue
+
         availability_bonus = 0.05 if is_partial else (0.10 if window_active else 0.0)
-        score = (overlap / max(len(task_skills), 1)) * 0.55 + (1.0 - normalized_distance) * 0.35 + availability_bonus
+
+        skill_score = (overlap / max(len(task_skills), 1)) if task_skills else 0.5
+        distance_score = (1.0 - normalized_distance)
+        trust_score_norm = min(trust_score / 100.0, 1.0)
+
+        score = (
+            skill_score * 0.50 +
+            distance_score * 0.28 +
+            availability_bonus * 0.60 +
+            language_match * 0.12 +
+            trust_score_norm * 0.05
+        )
+
+        why_parts = []
+        why_parts.append(f"{overlap}/{max(len(task_skills), 1)} skills")
+        why_parts.append(f"{round(dist_km)}km away")
+        if required_language:
+            why_parts.append(f"language: {volunteer_language or 'n/a'}")
+        if availability_bonus > 0:
+            why_parts.append("availability active")
+        if trust_score >= 50:
+            why_parts.append("strong trust history")
+
         matches.append({
             'volunteerId': v_doc.id,
             'score': score,
             'distanceKm': round(dist_km, 2),
+            'estimatedTravelMinutes': _estimate_travel_minutes(dist_km),
             'skillOverlap': overlap,
             'availabilityBonus': availability_bonus,
+            'languageMatch': language_match,
+            'trustScoreAtMatch': trust_score,
+            'explainFactors': {
+                'skillScore': round(skill_score, 4),
+                'distanceScore': round(distance_score, 4),
+                'availabilityBonus': round(availability_bonus, 4),
+                'languageScore': round(language_match, 4),
+                'trustScoreNorm': round(trust_score_norm, 4),
+            },
+            'whyMatched': ' | '.join(why_parts),
         })
 
     matches.sort(key=lambda x: x['score'], reverse=True)
@@ -245,15 +468,125 @@ def _run_matching_internal(task_id):
             'volunteerId': m['volunteerId'],
             'matchScore': m['score'],
             'distanceKm': m['distanceKm'],
+            'estimatedTravelMinutes': m['estimatedTravelMinutes'],
             'skillOverlap': m['skillOverlap'],
             'availabilityBonus': m['availabilityBonus'],
+            'languageMatch': m['languageMatch'],
+            'trustScoreAtMatch': m['trustScoreAtMatch'],
+            'explainFactors': m['explainFactors'],
+            'whyMatched': m['whyMatched'],
+            'explainVersion': 2,
+            'requiredLanguage': required_language,
+            'minTrustScore': min_trust_score,
+            'redispatchReason': redispatch_reason,
             'status': 'open',
             'missionBriefing': task_data.get('description', 'Mission Briefing'),
             'whatToBring': what_to_bring_text,
             'createdAt': firestore.SERVER_TIMESTAMP,
         })
     batch.commit()
-    return {'status': 'success', 'matches_generated': len(top_matches)}, 200
+    return {
+        'status': 'success',
+        'matches_generated': len(top_matches),
+        'excludedVolunteers': len(excluded_ids),
+        'filters': {
+            'requiredLanguage': required_language,
+            'minTrustScore': min_trust_score,
+            'filteredByTrust': filtered_trust,
+            'filteredByLanguage': filtered_language,
+            'filteredByRadius': filtered_radius,
+        },
+    }, 200
+
+
+def _redispatch_task(task_id, reason='manual', stale_hours=8):
+    if not db:
+        return {'error': 'Firestore not connected'}, 500
+
+    task_ref = db.collection('tasks').document(task_id)
+    task_doc = task_ref.get()
+    if not task_doc.exists:
+        return {'error': 'Task not found'}, 404
+
+    task_data = task_doc.to_dict() or {}
+    if _norm_text(task_data.get('status')) == 'done':
+        return {'status': 'skipped', 'reason': 'Task already done'}, 200
+
+    threshold = datetime.now(timezone.utc) - timedelta(hours=max(1, stale_hours))
+    stale_volunteer_ids = []
+    stale_match_ids = []
+
+    try:
+        mr_stream = db.collection('match_records').where('taskId', '==', task_id).where('status', '==', 'accepted').stream()
+        for mr in mr_stream:
+            md = mr.to_dict() or {}
+            accepted_time = _to_utc(md.get('acceptedAt')) or _to_utc(md.get('createdAt'))
+            if accepted_time and accepted_time < threshold:
+                vid = md.get('volunteerId')
+                if vid:
+                    stale_volunteer_ids.append(vid)
+                stale_match_ids.append(mr.id)
+                db.collection('match_records').document(mr.id).update({
+                    'status': 'expired',
+                    'redispatchMeta': {
+                        'reason': reason,
+                        'expiredAt': firestore.SERVER_TIMESTAMP,
+                        'staleHours': stale_hours,
+                    },
+                })
+    except Exception as e:
+        print(f"redispatch stale scan failed: {e}")
+
+    result, code = _run_matching_internal(
+        task_id,
+        exclude_volunteer_ids=stale_volunteer_ids,
+        redispatch_reason=reason,
+    )
+
+    if code == 200:
+        try:
+            task_ref.update({
+                'lastRedispatchAt': firestore.SERVER_TIMESTAMP,
+                'lastRedispatchReason': reason,
+                'redispatchCount': firestore.Increment(1),
+            })
+        except Exception as e:
+            print(f"task redispatch metadata update failed: {e}")
+
+        result['staleMatchesExpired'] = len(stale_match_ids)
+        result['staleVolunteersExcluded'] = len(stale_volunteer_ids)
+
+    return result, code
+
+
+def _run_redispatch_cycle(stale_hours=8, limit=25):
+    if not db:
+        return {'error': 'Firestore not connected'}, 500
+
+    threshold = datetime.now(timezone.utc) - timedelta(hours=max(1, stale_hours))
+    task_ids = set()
+
+    try:
+        accepted_stream = db.collection('match_records').where('status', '==', 'accepted').stream()
+        for mr in accepted_stream:
+            md = mr.to_dict() or {}
+            accepted_time = _to_utc(md.get('acceptedAt')) or _to_utc(md.get('createdAt'))
+            task_id = md.get('taskId')
+            if not task_id or not accepted_time:
+                continue
+            if accepted_time < threshold:
+                task_ids.add(task_id)
+            if len(task_ids) >= max(1, limit):
+                break
+    except Exception as e:
+        return {'error': f'redispatch cycle scan failed: {e}'}, 500
+
+    processed = []
+    for tid in task_ids:
+        res, code = _redispatch_task(tid, reason='auto_stale_acceptance', stale_hours=stale_hours)
+        processed.append({'taskId': tid, 'code': code, 'result': res})
+
+    return {'status': 'success', 'processedCount': len(processed), 'processed': processed}, 200
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -355,11 +688,26 @@ def webhook():
 
     doc_id = str(uuid.uuid4())
     try:
+        upload_fp = _fingerprint(ngo_id, file_type, file_path)
+        quality_flags = []
+        if _check_recent_text_duplicate(ngo_id, upload_fp, hours=12):
+            quality_flags.append('possible_duplicate_upload')
+            _log_quality_event(
+                event_type='duplicate_media_upload_detected',
+                severity='low',
+                ngo_id=ngo_id,
+                related={'rawUploadId': doc_id},
+                flags=quality_flags,
+                details={'uploadFingerprint': upload_fp},
+            )
+
         db.collection('raw_uploads').document(doc_id).set({
             'id': doc_id, 'ngoId': ngo_id,
             'cloudinaryUrl': cloudinary_url,
             'cloudinaryPublicId': cloudinary_public_id,
             'fileType': file_type,
+            'uploadFingerprint': upload_fp,
+            'qualityFlags': quality_flags,
             'uploadedAt': firestore.SERVER_TIMESTAMP,
             'status': 'pending',
         })
@@ -382,6 +730,7 @@ def generate_tasks():
 
     problem_card_id = payload.get('problemCardId')
     ngo_id = payload.get('ngoId')
+    force_regenerate = bool(payload.get('forceRegenerate', False))
     if not problem_card_id or not ngo_id:
         return jsonify({'status': 'error', 'reason': 'problemCardId and ngoId required'}), 400
 
@@ -394,10 +743,50 @@ def generate_tasks():
     except Exception as e:
         return jsonify({'status': 'error', 'reason': f'Firestore read failed: {e}'}), 500
 
-    description   = pc.get('description', 'No description')
-    issue_type    = pc.get('issueType', 'other')
-    severity_level = pc.get('severityLevel', 'low')
-    affected_count = pc.get('affectedCount', 0)
+    if pc.get('ngoId') != ngo_id:
+        return jsonify({'status': 'error', 'reason': 'ngoId does not own this problem card'}), 403
+
+    if pc.get('status') not in ('approved', 'pending_review', None):
+        return jsonify({'status': 'error', 'reason': 'ProblemCard status not valid for task generation'}), 409
+
+    quality_flags = []
+
+    if not force_regenerate:
+        try:
+            existing = db.collection('tasks').where('problemCardId', '==', problem_card_id).stream()
+            existing_ids = [d.id for d in existing]
+            if existing_ids:
+                return jsonify({
+                    'status': 'success',
+                    'taskIds': existing_ids,
+                    'priorityScore': _safe_float(pc.get('priorityScore', 0.0), default=0.0, min_value=0.0, max_value=100.0),
+                    'qualityFlags': quality_flags,
+                    'idempotent': True,
+                }), 200
+        except Exception as e:
+            print(f"Existing task check failed: {e}")
+
+    description = str(pc.get('description', 'No description'))[:600]
+    issue_type = str(pc.get('issueType', 'other')).strip().lower()
+    severity_level = str(pc.get('severityLevel', 'low')).strip().lower()
+    affected_count = _safe_int(pc.get('affectedCount', 0), default=0, min_value=0, max_value=100000)
+
+    if issue_type not in ALLOWED_ISSUE_TYPES:
+        issue_type = 'other'
+        quality_flags.append('issue_type_normalized')
+    if severity_level not in ALLOWED_SEVERITY:
+        severity_level = 'low'
+        quality_flags.append('severity_normalized')
+
+    is_duplicate_card, dup_fp = _check_problem_duplicate(
+        problem_card_id,
+        ngo_id,
+        issue_type,
+        pc.get('locationWard', ''),
+        pc.get('locationCity', ''),
+        description,
+    )
+    quality_flags.append('possible_duplicate_problem_card' if is_duplicate_card else 'no_duplicate_problem_card')
 
     task_prompt = (
         f"Community problem: {description}, issue type: {issue_type}, "
@@ -432,14 +821,16 @@ def generate_tasks():
     created_task_ids = []
     for task_data in tasks_json:
         task_id = str(uuid.uuid4())
+        estimated_volunteers = _safe_int(task_data.get('estimatedVolunteers', 1), default=1, min_value=1, max_value=10)
+        estimated_hours = _safe_float(task_data.get('estimatedDurationHours', 1), default=1.0, min_value=0.5, max_value=24.0)
         task_doc = {
             'id': task_id,
             'problemCardId': problem_card_id,
-            'taskType': task_data.get('taskType', 'other'),
-            'description': task_data.get('description', 'Volunteer task'),
+            'taskType': str(task_data.get('taskType', 'other')),
+            'description': str(task_data.get('description', 'Volunteer task'))[:140],
             'skillTags': task_data.get('skillTags', []),
-            'estimatedVolunteers': task_data.get('estimatedVolunteers', 1),
-            'estimatedDurationHours': float(task_data.get('estimatedDurationHours', 1)),
+            'estimatedVolunteers': estimated_volunteers,
+            'estimatedDurationHours': estimated_hours,
             'status': 'open',
             'assignedVolunteerIds': [],
             'locationWard': pc.get('locationWard', 'Unknown Ward'),
@@ -481,9 +872,21 @@ def generate_tasks():
             'scaleContrib':    round(scale_contrib, 2),
             'recencyContrib':  round(recency_contrib, 2),
             'gapContrib':      round(gap_contrib, 2),
+            'dupFingerprint': dup_fp,
+            'qualityFlags': quality_flags,
         })
     except Exception as e:
         print(f"Priority score update failed: {e}")
+
+    if is_duplicate_card:
+        _log_quality_event(
+            event_type='duplicate_problem_card_detected',
+            severity='high',
+            ngo_id=ngo_id,
+            related={'problemCardId': problem_card_id},
+            flags=quality_flags,
+            details={'dupFingerprint': dup_fp},
+        )
 
     # Chain matching directly — no fake HTTP context
     for tid in created_task_ids:
@@ -493,7 +896,7 @@ def generate_tasks():
         except Exception as e:
             print(f"Matching failed for {tid}: {e}")
 
-    return jsonify({'status': 'success', 'taskIds': created_task_ids, 'priorityScore': round(priority_score, 2)}), 200
+    return jsonify({'status': 'success', 'taskIds': created_task_ids, 'priorityScore': round(priority_score, 2), 'qualityFlags': quality_flags}), 200
 
 
 @app.route('/run-matching', methods=['POST'])
@@ -504,6 +907,213 @@ def run_matching():
         return jsonify({'error': 'Missing taskId'}), 400
     result, status_code = _run_matching_internal(task_id)
     return jsonify(result), status_code
+
+
+@app.route('/redispatch-task', methods=['POST'])
+def redispatch_task():
+    payload = request.json or {}
+    task_id = payload.get('taskId')
+    reason = payload.get('reason', 'manual')
+    stale_hours = _safe_int(payload.get('staleHours', 8), default=8, min_value=1, max_value=240)
+    if not task_id:
+        return jsonify({'error': 'Missing taskId'}), 400
+    result, status_code = _redispatch_task(task_id, reason=reason, stale_hours=stale_hours)
+    return jsonify(result), status_code
+
+
+@app.route('/redispatch-cycle', methods=['POST'])
+def redispatch_cycle():
+    payload = request.json or {}
+    stale_hours = _safe_int(payload.get('staleHours', 8), default=8, min_value=1, max_value=240)
+    limit = _safe_int(payload.get('limit', 25), default=25, min_value=1, max_value=200)
+    result, status_code = _run_redispatch_cycle(stale_hours=stale_hours, limit=limit)
+    return jsonify(result), status_code
+
+
+@app.route('/sync-task-update', methods=['POST'])
+def sync_task_update():
+    payload = request.json or {}
+    action_id = payload.get('actionId')
+    match_record_id = payload.get('matchRecordId')
+    task_id = payload.get('taskId')
+    volunteer_id = payload.get('volunteerId')
+    updates = payload.get('updates', {}) or {}
+    client_updated_iso = payload.get('clientUpdatedAtIso')
+    local_merge_note = payload.get('localMergeNote', '')
+
+    if not match_record_id:
+        return jsonify({'error': 'Missing matchRecordId'}), 400
+
+    if not isinstance(updates, dict):
+        return jsonify({'error': 'updates must be an object'}), 400
+
+    mr_ref = db.collection('match_records').document(match_record_id)
+    mr_doc = mr_ref.get()
+    if not mr_doc.exists:
+        return jsonify({'error': 'MatchRecord not found'}), 404
+
+    mr_data = mr_doc.to_dict() or {}
+    if not task_id:
+        task_id = mr_data.get('taskId', '')
+    if not volunteer_id:
+        volunteer_id = mr_data.get('volunteerId', '')
+
+    server_updated = _to_utc(mr_data.get('updatedAt')) or _to_utc(mr_data.get('createdAt'))
+    client_updated = None
+    if client_updated_iso:
+        try:
+            client_updated = datetime.fromisoformat(str(client_updated_iso).replace('Z', '+00:00'))
+            client_updated = client_updated.astimezone(timezone.utc)
+        except Exception:
+            client_updated = None
+
+    conflict = bool(server_updated and client_updated and server_updated > client_updated)
+    if conflict:
+        note = _norm_text(local_merge_note)
+        patch = {
+            'pendingLocalMergeNote': note,
+            'pendingLocalMergeAt': firestore.SERVER_TIMESTAMP,
+            'pendingLocalMergeSource': 'offline_queue',
+            'updatedAt': firestore.SERVER_TIMESTAMP,
+        }
+        mr_ref.update(patch)
+
+        _log_sync_conflict(
+            match_record_id=match_record_id,
+            task_id=task_id,
+            volunteer_id=volunteer_id,
+            local_note=note,
+            reason='server_newer_than_client',
+            action_id=action_id,
+        )
+
+        _log_quality_event(
+            event_type='offline_sync_conflict',
+            severity='medium',
+            ngo_id=None,
+            related={'matchRecordId': match_record_id, 'taskId': task_id, 'volunteerId': volunteer_id},
+            flags=['server_wins_conflict'],
+            details={'actionId': action_id, 'localMergeNote': note},
+        )
+
+        return jsonify({'status': 'conflict_resolved_server_wins', 'conflict': True, 'policy': 'server_wins'}), 200
+
+    match_updates = {}
+    allowed_match_status = {'accepted', 'proof_submitted', 'proof_rejected', 'proof_approved'}
+    new_match_status = _norm_text(updates.get('matchStatus'))
+    if new_match_status in allowed_match_status:
+        match_updates['status'] = new_match_status
+
+    offline_note = _norm_text(updates.get('offlineNote') or local_merge_note)
+    if offline_note:
+        match_updates['offlineNote'] = offline_note[:240]
+
+    if match_updates:
+        match_updates['updatedAt'] = firestore.SERVER_TIMESTAMP
+        mr_ref.update(match_updates)
+
+    if task_id:
+        task_updates = {}
+        new_task_status = _norm_text(updates.get('taskStatus'))
+        if new_task_status in {'open', 'filled', 'done'}:
+            task_updates['status'] = new_task_status
+        if offline_note:
+            task_updates['offlineNote'] = offline_note[:240]
+        if task_updates:
+            task_updates['updatedAt'] = firestore.SERVER_TIMESTAMP
+            db.collection('tasks').document(task_id).update(task_updates)
+
+    return jsonify({'status': 'applied', 'conflict': False}), 200
+
+
+@app.route('/simulate-scenario', methods=['POST'])
+def simulate_scenario():
+    payload = request.json or {}
+    ngo_id = payload.get('ngoId')
+    if not ngo_id:
+        return jsonify({'error': 'Missing ngoId'}), 400
+
+    shortage_percent = _safe_float(payload.get('shortagePercent', 20), default=20.0, min_value=0.0, max_value=95.0)
+    surge_percent = _safe_float(payload.get('surgePercent', 30), default=30.0, min_value=0.0, max_value=300.0)
+    horizon_days = _safe_int(payload.get('horizonDays', 7), default=7, min_value=1, max_value=30)
+
+    try:
+        tasks = []
+        for tdoc in db.collection('tasks').where('ngoId', '==', ngo_id).stream():
+            t = tdoc.to_dict() or {}
+            status = _norm_text(t.get('status'))
+            if status in ('open', 'filled', 'accepted', ''):
+                tasks.append(t)
+
+        active_volunteers = 0
+        for vdoc in db.collection('volunteer_profiles').where('availabilityWindowActive', '==', True).stream():
+            v = vdoc.to_dict() or {}
+            if _safe_int(v.get('trustScore', 0), default=0, min_value=0, max_value=1000) >= 0:
+                active_volunteers += 1
+
+        total_slots = 0.0
+        avg_duration = 2.0
+        if tasks:
+            durations = []
+            for t in tasks:
+                slots = _safe_int(t.get('estimatedVolunteers', 1), default=1, min_value=1, max_value=20)
+                total_slots += slots
+                durations.append(_safe_float(t.get('estimatedDurationHours', 2), default=2.0, min_value=0.5, max_value=48.0))
+            avg_duration = sum(durations) / max(len(durations), 1)
+
+        base_demand = max(total_slots, 1.0)
+        base_supply = max(float(active_volunteers), 1.0)
+
+        adjusted_supply = max(1.0, base_supply * (1.0 - shortage_percent / 100.0))
+        adjusted_demand = max(1.0, base_demand * (1.0 + surge_percent / 100.0))
+
+        projected_coverage = min(100.0, (adjusted_supply / adjusted_demand) * 100.0)
+        backlog_slots = max(0.0, adjusted_demand - adjusted_supply)
+        expected_delay_hours = min(96.0, (adjusted_demand / adjusted_supply) * avg_duration)
+
+        if projected_coverage < 40:
+            risk_level = 'critical'
+        elif projected_coverage < 65:
+            risk_level = 'high'
+        elif projected_coverage < 85:
+            risk_level = 'medium'
+        else:
+            risk_level = 'low'
+
+        run_id = str(uuid.uuid4())
+        result = {
+            'runId': run_id,
+            'ngoId': ngo_id,
+            'inputs': {
+                'shortagePercent': round(shortage_percent, 1),
+                'surgePercent': round(surge_percent, 1),
+                'horizonDays': horizon_days,
+            },
+            'baseline': {
+                'activeVolunteers': int(base_supply),
+                'openTaskSlots': int(round(base_demand)),
+                'avgTaskDurationHours': round(avg_duration, 2),
+            },
+            'projection': {
+                'projectedCoveragePercent': round(projected_coverage, 1),
+                'expectedBacklogSlots': int(round(backlog_slots)),
+                'expectedDelayHours': round(expected_delay_hours, 1),
+                'riskLevel': risk_level,
+            },
+        }
+
+        db.collection('scenario_runs').document(run_id).set({
+            'id': run_id,
+            'ngoId': ngo_id,
+            'inputs': result['inputs'],
+            'baseline': result['baseline'],
+            'projection': result['projection'],
+            'createdAt': firestore.SERVER_TIMESTAMP,
+        })
+
+        return jsonify({'status': 'success', 'result': result}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/send-availability-reminders', methods=['POST'])
@@ -597,7 +1207,7 @@ Return ONLY valid JSON:
                 try:
                     res = requests.get(url, timeout=10)
                     if res.ok:
-                        contents.append({'mime_type': 'image/jpeg', 'data': res.content})
+                        contents.append(genai.types.Part.from_bytes(data=res.content, mime_type='image/jpeg'))
                 except Exception:
                     pass
             
@@ -629,12 +1239,56 @@ Return ONLY valid JSON:
                 vol_doc = vol_ref.get()
                 if vol_doc.exists:
                     v_data = vol_doc.to_dict()
-                    curr_score = v_data.get('trustScore', 0)
-                    tasks_comp = v_data.get('tasksCompleted', 0)
+                    curr_score = _safe_int(v_data.get('trustScore', 0), default=0, min_value=0, max_value=1000)
+                    tasks_comp = _safe_int(v_data.get('tasksCompleted', 0), default=0, min_value=0, max_value=100000)
+                    anomaly_flags = []
+
+                    ms = _safe_float(mr_data.get('matchScore', 0.0), default=0.0, min_value=0.0, max_value=10.0)
+                    if ms > 1.0:
+                        anomaly_flags.append('match_score_out_of_expected_range')
+
+                    if curr_score + 10 > 200:
+                        anomaly_flags.append('trust_score_high_growth')
+
+                    try:
+                        recent_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
+                        recent = db.collection('match_records') \
+                            .where('volunteerId', '==', volunteer_id) \
+                            .where('status', '==', 'proof_approved') \
+                            .stream()
+                        recent_count = 0
+                        for r in recent:
+                            rd = r.to_dict() or {}
+                            ts = rd.get('completedAt') or rd.get('createdAt')
+                            if ts and hasattr(ts, 'replace'):
+                                t = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
+                                if t >= recent_threshold:
+                                    recent_count += 1
+                        if recent_count >= 20:
+                            anomaly_flags.append('high_approval_volume_24h')
+                    except Exception as e:
+                        print(f"recent anomaly check failed: {e}")
+
+                    if anomaly_flags:
+                        _log_quality_event(
+                            event_type='proof_approval_anomaly',
+                            severity='medium',
+                            ngo_id=ngo_id,
+                            related={'matchRecordId': match_record_id, 'volunteerId': volunteer_id},
+                            flags=anomaly_flags,
+                            details={'currentTrustScore': curr_score},
+                        )
+
                     vol_ref.update({
                         'trustScore': curr_score + 10,
                         'tasksCompleted': tasks_comp + 1
                     })
+
+                    if anomaly_flags:
+                        db.collection('match_records').document(match_record_id).update({
+                            'qualityFlags': anomaly_flags,
+                            'qualityReviewedAt': firestore.SERVER_TIMESTAMP,
+                        })
             
             # Return immediate success without creating NGO notification queue
             # (Note: App can poll or rely on stream for completion cascade)
@@ -913,6 +1567,10 @@ def _start_scheduler():
     scheduler.add_job(
         func=lambda: send_availability_reminders(),
         trigger="cron", day_of_week='fri', hour=12, minute=30,
+    )
+    scheduler.add_job(
+        func=lambda: _run_redispatch_cycle(stale_hours=8, limit=25),
+        trigger="interval", minutes=30,
     )
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown(wait=False))

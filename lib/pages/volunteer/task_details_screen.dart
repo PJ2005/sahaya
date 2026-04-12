@@ -363,6 +363,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   String? _buildMatchExplanation(Map<String, dynamic> matchData) {
+    final direct = matchData['whyMatched']?.toString().trim();
+    if (direct != null && direct.isNotEmpty) {
+      return direct;
+    }
+
     final parts = <String>[];
 
     final distanceKm = (matchData['distanceKm'] as num?)?.toDouble();
@@ -379,6 +384,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final availabilityBonus = (matchData['availabilityBonus'] as num?)?.toDouble() ?? 0;
     if (availabilityBonus > 0) {
       parts.add('available this weekend');
+    }
+
+    final lang = (matchData['requiredLanguage'] ?? '').toString().trim();
+    if (lang.isNotEmpty) {
+      final langScore = (matchData['languageMatch'] as num?)?.toDouble() ?? 0;
+      if (langScore >= 1) {
+        parts.add('language fit: $lang');
+      }
+    }
+
+    final trust = (matchData['trustScoreAtMatch'] as num?)?.toInt();
+    if (trust != null && trust > 0) {
+      parts.add('trust score: $trust');
     }
 
     if (parts.isEmpty) return null;
