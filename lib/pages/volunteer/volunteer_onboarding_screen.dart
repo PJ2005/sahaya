@@ -20,6 +20,9 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
   final PageController _pageCtrl = PageController();
   int _step = 0;
 
+  // Step 0
+  final TextEditingController _usernameCtrl = TextEditingController();
+
   // Step 1
   GeoPoint? _loc;
   double _radius = 10;
@@ -37,13 +40,36 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
 
   bool _saving = false;
 
-  void _next() {
-    if (_step == 0 && _loc == null) { _snack('Share your location to continue'); return; }
-    if (_step == 1 && _picked.isEmpty) { _snack('Pick at least one skill'); return; }
-    if (_step < 2) { 
+  Future<void> _next() async {
+    if (_step == 0) {
+      final username = _usernameCtrl.text.trim();
+      if (username.isEmpty) { _snack('Choose a username to continue'); return; }
+      
+      setState(() => _fetching = true);
+      try {
+        final qs = await FirebaseFirestore.instance
+            .collection('volunteer_profiles')
+            .where('username', isEqualTo: username)
+            .limit(1)
+            .get();
+        if (qs.docs.isNotEmpty) {
+          _snack('This username is already taken. Try another.');
+          return;
+        }
+      } catch (e) {
+        _snack('Error checking username: $e');
+        return;
+      } finally {
+        setState(() => _fetching = false);
+      }
+    }
+
+    if (_step == 1 && _loc == null) { _snack('Share your location to continue'); return; }
+    if (_step == 2 && _picked.isEmpty) { _snack('Pick at least one skill'); return; }
+    if (_step < 3) { 
       // If the user typed a custom skill but forgot to hit Add, auto-add it
       final text = _customSkillCtrl.text.trim().toLowerCase().replaceAll(' ', '_');
-      if (_step == 1 && text.isNotEmpty && !_skills.contains(text)) {
+      if (_step == 2 && text.isNotEmpty && !_skills.contains(text)) {
         _skills.add(text);
         _picked.add(text);
         _customSkillCtrl.clear();
@@ -67,7 +93,9 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
       if (perm == LocationPermission.denied) throw Exception('Permission denied');
       if (perm == LocationPermission.deniedForever) throw Exception('Location permanently denied — enable in settings');
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
       setState(() { _loc = GeoPoint(pos.latitude, pos.longitude); _fetching = false; });
     } catch (e) {
       setState(() { _fetching = false; _locError = e.toString(); });
@@ -86,7 +114,8 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
       } catch (_) {}
 
       final profile = VolunteerProfile(
-        id: user.uid, uid: user.uid, locationGeoPoint: _loc ?? const GeoPoint(0, 0), radiusKm: _radius,
+        id: user.uid, uid: user.uid, username: _usernameCtrl.text.trim(),
+        locationGeoPoint: _loc ?? const GeoPoint(0, 0), radiusKm: _radius,
         skillTags: _picked.toList(), languagePref: _lang ?? 'English', availabilityWindowActive: true,
         availabilityUpdatedAt: DateTime.now(), fcmToken: token,
       );
@@ -101,7 +130,16 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: T('Join Sahaya', style: GoogleFonts.inter(fontWeight: FontWeight.w800))),
+      appBar: AppBar(
+        title: T('Join Sahaya', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Sign Out',
+            onPressed: () => FirebaseAuth.instance.signOut(),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           // Progress
@@ -110,7 +148,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: (_step + 1) / 3,
+                value: (_step + 1) / 4,
                 minHeight: 5,
                 backgroundColor: Theme.of(context).brightness == Brightness.dark ? SahayaColors.darkBorder : const Color(0xFFE5E7EB),
                 valueColor: AlwaysStoppedAnimation(cs.primary),
@@ -123,7 +161,7 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
               controller: _pageCtrl,
               physics: const NeverScrollableScrollPhysics(),
               onPageChanged: (i) => setState(() => _step = i),
-              children: [_locationStep(), _skillsStep(), _languageStep()],
+              children: [_usernameStep(), _locationStep(), _skillsStep(), _languageStep()],
             ),
           ),
 
@@ -144,10 +182,10 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _saving ? null : _next,
-                      child: _saving
+                      onPressed: (_saving || _fetching) ? null : _next,
+                      child: (_saving || _fetching)
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : T(_step == 2 ? 'Complete' : 'Continue', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                          : T(_step == 3 ? 'Complete' : 'Continue', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
@@ -298,11 +336,53 @@ class _VolunteerOnboardingScreenState extends State<VolunteerOnboardingScreen> {
           const SizedBox(height: 28),
           ..._languages.map((l) => RadioListTile<String>(
             title: T(l, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            value: l, groupValue: _lang,
-            onChanged: (v) => setState(() => _lang = v),
+            value: l, 
+            groupValue: _lang, // ignore: deprecated_member_use
+            onChanged: (v) => setState(() => _lang = v), // ignore: deprecated_member_use
             activeColor: cs.primary,
             contentPadding: EdgeInsets.zero,
           )),
+        ],
+      ),
+    );
+  }
+
+  // ──── Step 0 ────
+  Widget _usernameStep() {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80, height: 80,
+            decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(24)),
+            child: Icon(Icons.face_rounded, size: 40, color: cs.primary),
+          ),
+          const SizedBox(height: 28),
+          T('Create Identity', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          const SizedBox(height: 8),
+          T('Choose a username so the team knows you.', style: GoogleFonts.inter(color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted, fontSize: 15)),
+          const SizedBox(height: 32),
+          TextField(
+            controller: _usernameCtrl,
+            style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              hintText: 'e.g. superhero123',
+              prefixIcon: Icon(Icons.alternate_email_rounded, color: cs.primary),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          TextButton(
+            onPressed: () => FirebaseAuth.instance.signOut(),
+            child: T(
+              'Already have an account? Sign In',
+              style: GoogleFonts.inter(color: cs.primary, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
     );

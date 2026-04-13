@@ -58,13 +58,23 @@ Map<String, dynamic> _$ProblemCardToJson(_ProblemCard instance) =>
     };
 
 const _$IssueTypeEnumMap = {
-  IssueType.water_access: 'water_access',
-  IssueType.sanitation: 'sanitation',
-  IssueType.education: 'education',
-  IssueType.nutrition: 'nutrition',
-  IssueType.healthcare: 'healthcare',
-  IssueType.livelihood: 'livelihood',
-  IssueType.other: 'other',
+  IssueType.sdg1_no_poverty: 'sdg1_no_poverty',
+  IssueType.sdg2_zero_hunger: 'sdg2_zero_hunger',
+  IssueType.sdg3_good_health_and_well_being: 'sdg3_good_health_and_well_being',
+  IssueType.sdg4_quality_education: 'sdg4_quality_education',
+  IssueType.sdg5_gender_equality: 'sdg5_gender_equality',
+  IssueType.sdg6_clean_water_and_sanitation: 'sdg6_clean_water_and_sanitation',
+  IssueType.sdg7_affordable_and_clean_energy: 'sdg7_affordable_and_clean_energy',
+  IssueType.sdg8_decent_work_and_economic_growth: 'sdg8_decent_work_and_economic_growth',
+  IssueType.sdg9_industry_innovation_and_infrastructure: 'sdg9_industry_innovation_and_infrastructure',
+  IssueType.sdg10_reduced_inequalities: 'sdg10_reduced_inequalities',
+  IssueType.sdg11_sustainable_cities_and_communities: 'sdg11_sustainable_cities_and_communities',
+  IssueType.sdg12_responsible_consumption_and_production: 'sdg12_responsible_consumption_and_production',
+  IssueType.sdg13_climate_action: 'sdg13_climate_action',
+  IssueType.sdg14_life_below_water: 'sdg14_life_below_water',
+  IssueType.sdg15_life_on_land: 'sdg15_life_on_land',
+  IssueType.sdg16_peace_justice_and_strong_institutions: 'sdg16_peace_justice_and_strong_institutions',
+  IssueType.sdg17_partnerships_for_the_goals: 'sdg17_partnerships_for_the_goals',
 };
 
 const _$SeverityLevelEnumMap = {

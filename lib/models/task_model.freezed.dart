@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TaskModel {
 
- String get id; String get problemCardId; TaskType get taskType; String get description; List<String> get skillTags; int get estimatedVolunteers; double get estimatedDurationHours; TaskStatus get status; List<String> get assignedVolunteerIds; String get locationWard;@OptionalGeoPointConverter() GeoPoint? get locationGeoPoint;
+ String get id; String get problemCardId;@JsonKey(unknownEnumValue: TaskType.other) TaskType get taskType; String get description; List<String> get skillTags; int get estimatedVolunteers; double get estimatedDurationHours;@JsonKey(unknownEnumValue: TaskStatus.open) TaskStatus get status; List<String> get assignedVolunteerIds; bool get isProofSubmitted; String get locationWard;@OptionalGeoPointConverter() GeoPoint? get locationGeoPoint;
 /// Create a copy of TaskModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $TaskModelCopyWith<TaskModel> get copyWith => _$TaskModelCopyWithImpl<TaskModel>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TaskModel&&(identical(other.id, id) || other.id == id)&&(identical(other.problemCardId, problemCardId) || other.problemCardId == problemCardId)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other.skillTags, skillTags)&&(identical(other.estimatedVolunteers, estimatedVolunteers) || other.estimatedVolunteers == estimatedVolunteers)&&(identical(other.estimatedDurationHours, estimatedDurationHours) || other.estimatedDurationHours == estimatedDurationHours)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other.assignedVolunteerIds, assignedVolunteerIds)&&(identical(other.locationWard, locationWard) || other.locationWard == locationWard)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TaskModel&&(identical(other.id, id) || other.id == id)&&(identical(other.problemCardId, problemCardId) || other.problemCardId == problemCardId)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other.skillTags, skillTags)&&(identical(other.estimatedVolunteers, estimatedVolunteers) || other.estimatedVolunteers == estimatedVolunteers)&&(identical(other.estimatedDurationHours, estimatedDurationHours) || other.estimatedDurationHours == estimatedDurationHours)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other.assignedVolunteerIds, assignedVolunteerIds)&&(identical(other.isProofSubmitted, isProofSubmitted) || other.isProofSubmitted == isProofSubmitted)&&(identical(other.locationWard, locationWard) || other.locationWard == locationWard)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,problemCardId,taskType,description,const DeepCollectionEquality().hash(skillTags),estimatedVolunteers,estimatedDurationHours,status,const DeepCollectionEquality().hash(assignedVolunteerIds),locationWard,locationGeoPoint);
+int get hashCode => Object.hash(runtimeType,id,problemCardId,taskType,description,const DeepCollectionEquality().hash(skillTags),estimatedVolunteers,estimatedDurationHours,status,const DeepCollectionEquality().hash(assignedVolunteerIds),isProofSubmitted,locationWard,locationGeoPoint);
 
 @override
 String toString() {
-  return 'TaskModel(id: $id, problemCardId: $problemCardId, taskType: $taskType, description: $description, skillTags: $skillTags, estimatedVolunteers: $estimatedVolunteers, estimatedDurationHours: $estimatedDurationHours, status: $status, assignedVolunteerIds: $assignedVolunteerIds, locationWard: $locationWard, locationGeoPoint: $locationGeoPoint)';
+  return 'TaskModel(id: $id, problemCardId: $problemCardId, taskType: $taskType, description: $description, skillTags: $skillTags, estimatedVolunteers: $estimatedVolunteers, estimatedDurationHours: $estimatedDurationHours, status: $status, assignedVolunteerIds: $assignedVolunteerIds, isProofSubmitted: $isProofSubmitted, locationWard: $locationWard, locationGeoPoint: $locationGeoPoint)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $TaskModelCopyWith<$Res>  {
   factory $TaskModelCopyWith(TaskModel value, $Res Function(TaskModel) _then) = _$TaskModelCopyWithImpl;
 @useResult
 $Res call({
- String id, String problemCardId, TaskType taskType, String description, List<String> skillTags, int estimatedVolunteers, double estimatedDurationHours, TaskStatus status, List<String> assignedVolunteerIds, String locationWard,@OptionalGeoPointConverter() GeoPoint? locationGeoPoint
+ String id, String problemCardId,@JsonKey(unknownEnumValue: TaskType.other) TaskType taskType, String description, List<String> skillTags, int estimatedVolunteers, double estimatedDurationHours,@JsonKey(unknownEnumValue: TaskStatus.open) TaskStatus status, List<String> assignedVolunteerIds, bool isProofSubmitted, String locationWard,@OptionalGeoPointConverter() GeoPoint? locationGeoPoint
 });
 
 
@@ -65,7 +65,7 @@ class _$TaskModelCopyWithImpl<$Res>
 
 /// Create a copy of TaskModel
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? problemCardId = null,Object? taskType = null,Object? description = null,Object? skillTags = null,Object? estimatedVolunteers = null,Object? estimatedDurationHours = null,Object? status = null,Object? assignedVolunteerIds = null,Object? locationWard = null,Object? locationGeoPoint = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? problemCardId = null,Object? taskType = null,Object? description = null,Object? skillTags = null,Object? estimatedVolunteers = null,Object? estimatedDurationHours = null,Object? status = null,Object? assignedVolunteerIds = null,Object? isProofSubmitted = null,Object? locationWard = null,Object? locationGeoPoint = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,problemCardId: null == problemCardId ? _self.problemCardId : problemCardId // ignore: cast_nullable_to_non_nullable
@@ -76,7 +76,8 @@ as List<String>,estimatedVolunteers: null == estimatedVolunteers ? _self.estimat
 as int,estimatedDurationHours: null == estimatedDurationHours ? _self.estimatedDurationHours : estimatedDurationHours // ignore: cast_nullable_to_non_nullable
 as double,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as TaskStatus,assignedVolunteerIds: null == assignedVolunteerIds ? _self.assignedVolunteerIds : assignedVolunteerIds // ignore: cast_nullable_to_non_nullable
-as List<String>,locationWard: null == locationWard ? _self.locationWard : locationWard // ignore: cast_nullable_to_non_nullable
+as List<String>,isProofSubmitted: null == isProofSubmitted ? _self.isProofSubmitted : isProofSubmitted // ignore: cast_nullable_to_non_nullable
+as bool,locationWard: null == locationWard ? _self.locationWard : locationWard // ignore: cast_nullable_to_non_nullable
 as String,locationGeoPoint: freezed == locationGeoPoint ? _self.locationGeoPoint : locationGeoPoint // ignore: cast_nullable_to_non_nullable
 as GeoPoint?,
   ));
@@ -163,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String problemCardId,  TaskType taskType,  String description,  List<String> skillTags,  int estimatedVolunteers,  double estimatedDurationHours,  TaskStatus status,  List<String> assignedVolunteerIds,  String locationWard, @OptionalGeoPointConverter()  GeoPoint? locationGeoPoint)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String problemCardId, @JsonKey(unknownEnumValue: TaskType.other)  TaskType taskType,  String description,  List<String> skillTags,  int estimatedVolunteers,  double estimatedDurationHours, @JsonKey(unknownEnumValue: TaskStatus.open)  TaskStatus status,  List<String> assignedVolunteerIds,  bool isProofSubmitted,  String locationWard, @OptionalGeoPointConverter()  GeoPoint? locationGeoPoint)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TaskModel() when $default != null:
-return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_that.skillTags,_that.estimatedVolunteers,_that.estimatedDurationHours,_that.status,_that.assignedVolunteerIds,_that.locationWard,_that.locationGeoPoint);case _:
+return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_that.skillTags,_that.estimatedVolunteers,_that.estimatedDurationHours,_that.status,_that.assignedVolunteerIds,_that.isProofSubmitted,_that.locationWard,_that.locationGeoPoint);case _:
   return orElse();
 
 }
@@ -184,10 +185,10 @@ return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String problemCardId,  TaskType taskType,  String description,  List<String> skillTags,  int estimatedVolunteers,  double estimatedDurationHours,  TaskStatus status,  List<String> assignedVolunteerIds,  String locationWard, @OptionalGeoPointConverter()  GeoPoint? locationGeoPoint)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String problemCardId, @JsonKey(unknownEnumValue: TaskType.other)  TaskType taskType,  String description,  List<String> skillTags,  int estimatedVolunteers,  double estimatedDurationHours, @JsonKey(unknownEnumValue: TaskStatus.open)  TaskStatus status,  List<String> assignedVolunteerIds,  bool isProofSubmitted,  String locationWard, @OptionalGeoPointConverter()  GeoPoint? locationGeoPoint)  $default,) {final _that = this;
 switch (_that) {
 case _TaskModel():
-return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_that.skillTags,_that.estimatedVolunteers,_that.estimatedDurationHours,_that.status,_that.assignedVolunteerIds,_that.locationWard,_that.locationGeoPoint);case _:
+return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_that.skillTags,_that.estimatedVolunteers,_that.estimatedDurationHours,_that.status,_that.assignedVolunteerIds,_that.isProofSubmitted,_that.locationWard,_that.locationGeoPoint);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -204,10 +205,10 @@ return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_t
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String problemCardId,  TaskType taskType,  String description,  List<String> skillTags,  int estimatedVolunteers,  double estimatedDurationHours,  TaskStatus status,  List<String> assignedVolunteerIds,  String locationWard, @OptionalGeoPointConverter()  GeoPoint? locationGeoPoint)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String problemCardId, @JsonKey(unknownEnumValue: TaskType.other)  TaskType taskType,  String description,  List<String> skillTags,  int estimatedVolunteers,  double estimatedDurationHours, @JsonKey(unknownEnumValue: TaskStatus.open)  TaskStatus status,  List<String> assignedVolunteerIds,  bool isProofSubmitted,  String locationWard, @OptionalGeoPointConverter()  GeoPoint? locationGeoPoint)?  $default,) {final _that = this;
 switch (_that) {
 case _TaskModel() when $default != null:
-return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_that.skillTags,_that.estimatedVolunteers,_that.estimatedDurationHours,_that.status,_that.assignedVolunteerIds,_that.locationWard,_that.locationGeoPoint);case _:
+return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_that.skillTags,_that.estimatedVolunteers,_that.estimatedDurationHours,_that.status,_that.assignedVolunteerIds,_that.isProofSubmitted,_that.locationWard,_that.locationGeoPoint);case _:
   return null;
 
 }
@@ -219,12 +220,12 @@ return $default(_that.id,_that.problemCardId,_that.taskType,_that.description,_t
 @JsonSerializable()
 
 class _TaskModel extends TaskModel {
-  const _TaskModel({required this.id, required this.problemCardId, required this.taskType, this.description = 'No description provided', required final  List<String> skillTags, required this.estimatedVolunteers, required this.estimatedDurationHours, required this.status, required final  List<String> assignedVolunteerIds, this.locationWard = 'Unknown Ward', @OptionalGeoPointConverter() this.locationGeoPoint}): _skillTags = skillTags,_assignedVolunteerIds = assignedVolunteerIds,super._();
+  const _TaskModel({required this.id, required this.problemCardId, @JsonKey(unknownEnumValue: TaskType.other) required this.taskType, this.description = 'No description provided', required final  List<String> skillTags, required this.estimatedVolunteers, required this.estimatedDurationHours, @JsonKey(unknownEnumValue: TaskStatus.open) required this.status, required final  List<String> assignedVolunteerIds, this.isProofSubmitted = false, this.locationWard = 'Unknown Ward', @OptionalGeoPointConverter() this.locationGeoPoint}): _skillTags = skillTags,_assignedVolunteerIds = assignedVolunteerIds,super._();
   factory _TaskModel.fromJson(Map<String, dynamic> json) => _$TaskModelFromJson(json);
 
 @override final  String id;
 @override final  String problemCardId;
-@override final  TaskType taskType;
+@override@JsonKey(unknownEnumValue: TaskType.other) final  TaskType taskType;
 @override@JsonKey() final  String description;
  final  List<String> _skillTags;
 @override List<String> get skillTags {
@@ -235,7 +236,7 @@ class _TaskModel extends TaskModel {
 
 @override final  int estimatedVolunteers;
 @override final  double estimatedDurationHours;
-@override final  TaskStatus status;
+@override@JsonKey(unknownEnumValue: TaskStatus.open) final  TaskStatus status;
  final  List<String> _assignedVolunteerIds;
 @override List<String> get assignedVolunteerIds {
   if (_assignedVolunteerIds is EqualUnmodifiableListView) return _assignedVolunteerIds;
@@ -243,6 +244,7 @@ class _TaskModel extends TaskModel {
   return EqualUnmodifiableListView(_assignedVolunteerIds);
 }
 
+@override@JsonKey() final  bool isProofSubmitted;
 @override@JsonKey() final  String locationWard;
 @override@OptionalGeoPointConverter() final  GeoPoint? locationGeoPoint;
 
@@ -259,16 +261,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TaskModel&&(identical(other.id, id) || other.id == id)&&(identical(other.problemCardId, problemCardId) || other.problemCardId == problemCardId)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other._skillTags, _skillTags)&&(identical(other.estimatedVolunteers, estimatedVolunteers) || other.estimatedVolunteers == estimatedVolunteers)&&(identical(other.estimatedDurationHours, estimatedDurationHours) || other.estimatedDurationHours == estimatedDurationHours)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other._assignedVolunteerIds, _assignedVolunteerIds)&&(identical(other.locationWard, locationWard) || other.locationWard == locationWard)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TaskModel&&(identical(other.id, id) || other.id == id)&&(identical(other.problemCardId, problemCardId) || other.problemCardId == problemCardId)&&(identical(other.taskType, taskType) || other.taskType == taskType)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other._skillTags, _skillTags)&&(identical(other.estimatedVolunteers, estimatedVolunteers) || other.estimatedVolunteers == estimatedVolunteers)&&(identical(other.estimatedDurationHours, estimatedDurationHours) || other.estimatedDurationHours == estimatedDurationHours)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other._assignedVolunteerIds, _assignedVolunteerIds)&&(identical(other.isProofSubmitted, isProofSubmitted) || other.isProofSubmitted == isProofSubmitted)&&(identical(other.locationWard, locationWard) || other.locationWard == locationWard)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,problemCardId,taskType,description,const DeepCollectionEquality().hash(_skillTags),estimatedVolunteers,estimatedDurationHours,status,const DeepCollectionEquality().hash(_assignedVolunteerIds),locationWard,locationGeoPoint);
+int get hashCode => Object.hash(runtimeType,id,problemCardId,taskType,description,const DeepCollectionEquality().hash(_skillTags),estimatedVolunteers,estimatedDurationHours,status,const DeepCollectionEquality().hash(_assignedVolunteerIds),isProofSubmitted,locationWard,locationGeoPoint);
 
 @override
 String toString() {
-  return 'TaskModel(id: $id, problemCardId: $problemCardId, taskType: $taskType, description: $description, skillTags: $skillTags, estimatedVolunteers: $estimatedVolunteers, estimatedDurationHours: $estimatedDurationHours, status: $status, assignedVolunteerIds: $assignedVolunteerIds, locationWard: $locationWard, locationGeoPoint: $locationGeoPoint)';
+  return 'TaskModel(id: $id, problemCardId: $problemCardId, taskType: $taskType, description: $description, skillTags: $skillTags, estimatedVolunteers: $estimatedVolunteers, estimatedDurationHours: $estimatedDurationHours, status: $status, assignedVolunteerIds: $assignedVolunteerIds, isProofSubmitted: $isProofSubmitted, locationWard: $locationWard, locationGeoPoint: $locationGeoPoint)';
 }
 
 
@@ -279,7 +281,7 @@ abstract mixin class _$TaskModelCopyWith<$Res> implements $TaskModelCopyWith<$Re
   factory _$TaskModelCopyWith(_TaskModel value, $Res Function(_TaskModel) _then) = __$TaskModelCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String problemCardId, TaskType taskType, String description, List<String> skillTags, int estimatedVolunteers, double estimatedDurationHours, TaskStatus status, List<String> assignedVolunteerIds, String locationWard,@OptionalGeoPointConverter() GeoPoint? locationGeoPoint
+ String id, String problemCardId,@JsonKey(unknownEnumValue: TaskType.other) TaskType taskType, String description, List<String> skillTags, int estimatedVolunteers, double estimatedDurationHours,@JsonKey(unknownEnumValue: TaskStatus.open) TaskStatus status, List<String> assignedVolunteerIds, bool isProofSubmitted, String locationWard,@OptionalGeoPointConverter() GeoPoint? locationGeoPoint
 });
 
 
@@ -296,7 +298,7 @@ class __$TaskModelCopyWithImpl<$Res>
 
 /// Create a copy of TaskModel
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? problemCardId = null,Object? taskType = null,Object? description = null,Object? skillTags = null,Object? estimatedVolunteers = null,Object? estimatedDurationHours = null,Object? status = null,Object? assignedVolunteerIds = null,Object? locationWard = null,Object? locationGeoPoint = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? problemCardId = null,Object? taskType = null,Object? description = null,Object? skillTags = null,Object? estimatedVolunteers = null,Object? estimatedDurationHours = null,Object? status = null,Object? assignedVolunteerIds = null,Object? isProofSubmitted = null,Object? locationWard = null,Object? locationGeoPoint = freezed,}) {
   return _then(_TaskModel(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,problemCardId: null == problemCardId ? _self.problemCardId : problemCardId // ignore: cast_nullable_to_non_nullable
@@ -307,7 +309,8 @@ as List<String>,estimatedVolunteers: null == estimatedVolunteers ? _self.estimat
 as int,estimatedDurationHours: null == estimatedDurationHours ? _self.estimatedDurationHours : estimatedDurationHours // ignore: cast_nullable_to_non_nullable
 as double,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as TaskStatus,assignedVolunteerIds: null == assignedVolunteerIds ? _self._assignedVolunteerIds : assignedVolunteerIds // ignore: cast_nullable_to_non_nullable
-as List<String>,locationWard: null == locationWard ? _self.locationWard : locationWard // ignore: cast_nullable_to_non_nullable
+as List<String>,isProofSubmitted: null == isProofSubmitted ? _self.isProofSubmitted : isProofSubmitted // ignore: cast_nullable_to_non_nullable
+as bool,locationWard: null == locationWard ? _self.locationWard : locationWard // ignore: cast_nullable_to_non_nullable
 as String,locationGeoPoint: freezed == locationGeoPoint ? _self.locationGeoPoint : locationGeoPoint // ignore: cast_nullable_to_non_nullable
 as GeoPoint?,
   ));

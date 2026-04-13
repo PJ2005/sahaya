@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task_model.dart';
 
@@ -7,7 +8,7 @@ class SeedService {
   Future<void> seedData() async {
     final tasks = await _db.collection('tasks').limit(1).get();
     if (tasks.docs.isNotEmpty) {
-      print('Data already seeded!');
+      debugPrint('Data already seeded!');
       return;
     }
 
@@ -28,9 +29,9 @@ class SeedService {
 
       await _db.collection('tasks').doc(task1.id).set(task1.toJson());
 
-      print('Successfully seeded initial test task!');
+      debugPrint('Successfully seeded initial test task!');
     } catch (e) {
-      print('Failed to seed data: $e');
+      debugPrint('Failed to seed data: $e');
     }
   }
 }

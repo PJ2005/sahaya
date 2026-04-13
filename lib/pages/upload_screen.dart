@@ -564,7 +564,7 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     await FirebaseFirestore.instance.collection('problem_cards').doc(raw.id).set({
       'id': raw.id,
       'ngoId': raw.ngoId,
-      'issueType': IssueType.other.name,
+      'issueType': IssueType.sdg11_sustainable_cities_and_communities.name,
       'locationWard': 'Manual Review Required',
       'locationCity': 'Manual Review Required',
       'locationGeoPoint': const GeoPoint(0, 0),

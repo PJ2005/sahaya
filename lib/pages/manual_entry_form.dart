@@ -16,7 +16,7 @@ class ManualEntryFormDialog extends StatefulWidget {
 
 class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
   final _formKey = GlobalKey<FormState>();
-  IssueType _issueType = IssueType.other;
+  IssueType _issueType = IssueType.sdg11_sustainable_cities_and_communities;
   SeverityLevel _severityLevel = SeverityLevel.medium;
   final _wardController = TextEditingController();
   final _cityController = TextEditingController();
@@ -98,13 +98,13 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
                 DropdownButtonFormField<IssueType>(
                   initialValue: _issueType,
                   decoration: const InputDecoration(
-                    labelText: 'Physical Classification',
+                    labelText: 'SDG Type',
                   ),
                   items: IssueType.values
                       .map(
                         (v) => DropdownMenuItem(
                           value: v,
-                          child: T(v.name.toUpperCase()),
+                          child: T(v.label),
                         ),
                       )
                       .toList(),

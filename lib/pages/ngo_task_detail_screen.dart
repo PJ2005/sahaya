@@ -5,6 +5,8 @@ import '../models/problem_card.dart';
 import '../components/ai_assistant_sheet.dart';
 import '../components/ai_batch_task_sheet.dart';
 import '../components/list_shimmer.dart';
+import '../components/volunteer_team_list.dart';
+import 'volunteer/task_chat_screen.dart';
 import '../theme/sahaya_theme.dart';
 import '../utils/translator.dart';
 
@@ -312,6 +314,25 @@ class _TaskItem extends StatelessWidget {
               T('${task['estimatedVolunteers'] ?? 1}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
+          
+          if ((task['assignedVolunteerIds'] as List?)?.isNotEmpty ?? false) ...[
+            const SizedBox(height: 16),
+            VolunteerTeamList(
+              volunteerIds: List<String>.from(task['assignedVolunteerIds']),
+              title: 'Active Contributors',
+            ),
+            const SizedBox(height: 12),
+            _actionBtn(context, Icons.forum_outlined, 'Coordination Chat', cs.primary, () {
+               Navigator.push(context, MaterialPageRoute(
+                builder: (_) => TaskChatScreen(
+                  taskId: doc.id,
+                  taskTitle: taskType.toUpperCase(),
+                  profileCollection: 'ngo_profiles',
+                ),
+              ));
+            }),
+          ],
+
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -471,7 +492,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
         child: Column(
           children: [
             DropdownButtonFormField<String>(
-              value: _defaultTaskTypes.contains(_taskType) ? _taskType : 'other',
+              initialValue: _defaultTaskTypes.contains(_taskType) ? _taskType : 'other',
               items: _defaultTaskTypes.map((s) => DropdownMenuItem(value: s, child: T(s.replaceAll('_', ' ')))).toList(),
               onChanged: (v) => setState(() => _taskType = v!),
               decoration: const InputDecoration(labelText: 'Task Type'),

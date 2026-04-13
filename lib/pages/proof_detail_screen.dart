@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../theme/sahaya_theme.dart';
 import '../models/problem_card.dart';
-import '../services/gemini_service.dart';
 import 'ngo_task_detail_screen.dart';
 import '../utils/translator.dart';
 
@@ -115,9 +114,9 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       if (!tdoc.exists || !mounted) return;
 
       setState(() => _taskData = tdoc.data());
-      final taskType =
+      /* final taskType =
           (_taskData?['taskType'] as String?)?.replaceAll('_', ' ') ??
-          'community task';
+          'community task'; */
 
       final pid = _taskData?['problemCardId'] as String? ?? '';
       if (pid.isNotEmpty) {
@@ -231,13 +230,14 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: T('Failed: $e'),
             backgroundColor: SahayaColors.coral,
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _processing = false);
     }
@@ -298,6 +298,13 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
             'aiVerificationReason': FieldValue.delete(),
             'aiVerifiedAt': FieldValue.delete(),
           });
+      
+      final tid = widget.matchData['taskId'] as String? ?? '';
+      if (tid.isNotEmpty) {
+        await FirebaseFirestore.instance.collection('tasks').doc(tid).update({
+          'isProofSubmitted': false,
+        });
+      }
       await _markNotificationHandled();
 
       final url =
@@ -325,13 +332,14 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: T('Failed: $e'),
             backgroundColor: SahayaColors.coral,
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _processing = false);
     }
@@ -457,13 +465,13 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                   childAspectRatio: 1.1,
                 ),
                 itemCount: _photos.length,
-                itemBuilder: (_, i) => GestureDetector(
-                  onTap: () => _fullScreen(context, _photos[i]),
+                itemBuilder: (context, index) => GestureDetector(
+                  onTap: () => _fullScreen(context, _photos[index]),
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       image: DecorationImage(
-                        image: NetworkImage(_photos[i]),
+                        image: NetworkImage(_photos[index]),
                         fit: BoxFit.cover,
                       ),
                       boxShadow: [sahayaCardShadow(context)],
@@ -592,8 +600,9 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
   }
 
   Widget _buildTaskOverview(BuildContext context, ColorScheme cs, bool isDark) {
-    if (_taskData == null)
+    if (_taskData == null) {
       return const Center(child: CircularProgressIndicator());
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),

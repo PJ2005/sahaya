@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../components/list_shimmer.dart';
+import '../models/problem_card.dart';
 import '../theme/sahaya_theme.dart';
 import '../l10n/app_text.dart';
 import '../utils/translator.dart';
@@ -606,21 +607,7 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
   }
 
   String _sdgTagForIssue(String issue) {
-    switch (issue.trim()) {
-      case 'water_access':
-      case 'sanitation':
-        return 'SDG 6';
-      case 'education':
-        return 'SDG 4';
-      case 'nutrition':
-        return 'SDG 2';
-      case 'healthcare':
-        return 'SDG 3';
-      case 'livelihood':
-        return 'SDG 8';
-      default:
-        return 'SDG 11';
-    }
+    return IssueTypeX.fromString(issue).sdgTag;
   }
 
   Future<List<Map<String, dynamic>>> _loadIncidentQueue() async {
@@ -727,8 +714,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
         SnackBar(content: T('Simulation error: $e'), backgroundColor: SahayaColors.coral),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _simLoading = false);
+      if (mounted) {
+        setState(() => _simLoading = false);
+      }
     }
   }
 

@@ -31,7 +31,9 @@ class ProofReviewScreen extends StatelessWidget {
             .where('ngoId', isEqualTo: ngoId)
             .snapshots(),
         builder: (context, cardsSnapshot) {
-          if (cardsSnapshot.hasError) return _emptyState(context);
+          if (cardsSnapshot.hasError) {
+            return _emptyState(context);
+          }
           if (cardsSnapshot.connectionState == ConnectionState.waiting &&
               !cardsSnapshot.hasData) {
             return const ListShimmer(itemCount: 6);
@@ -40,7 +42,9 @@ class ProofReviewScreen extends StatelessWidget {
           final cardIds =
               cardsSnapshot.data?.docs.map((doc) => doc.id).toList() ??
               <String>[];
-          if (cardIds.isEmpty) return _emptyState(context);
+          if (cardIds.isEmpty) {
+            return _emptyState(context);
+          }
 
           return StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
@@ -48,14 +52,19 @@ class ProofReviewScreen extends StatelessWidget {
                 .where('problemCardId', whereIn: cardIds.take(30).toList())
                 .snapshots(),
             builder: (context, tasksSnapshot) {
-              if (tasksSnapshot.hasError) return _emptyState(context);
-              if (!tasksSnapshot.hasData)
+              if (tasksSnapshot.hasError) {
+                return _emptyState(context);
+              }
+              if (!tasksSnapshot.hasData) {
                 return const ListShimmer(itemCount: 6);
+              }
 
               final taskIds = tasksSnapshot.data!.docs
                   .map((doc) => doc.id)
                   .toList();
-              if (taskIds.isEmpty) return _emptyState(context);
+              if (taskIds.isEmpty) {
+                return _emptyState(context);
+              }
 
               return StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -64,12 +73,17 @@ class ProofReviewScreen extends StatelessWidget {
                     .where('status', isEqualTo: 'proof_submitted')
                     .snapshots(),
                 builder: (context, matchSnapshot) {
-                  if (matchSnapshot.hasError) return _emptyState(context);
-                  if (!matchSnapshot.hasData)
+                  if (matchSnapshot.hasError) {
+                    return _emptyState(context);
+                  }
+                  if (!matchSnapshot.hasData) {
                     return const ListShimmer(itemCount: 6);
+                  }
 
                   final pendingDocs = matchSnapshot.data!.docs;
-                  if (pendingDocs.isEmpty) return _emptyState(context);
+                  if (pendingDocs.isEmpty) {
+                    return _emptyState(context);
+                  }
 
                   return ListView.builder(
                     padding: const EdgeInsets.symmetric(
@@ -143,7 +157,9 @@ class _ProofBlockState extends State<_ProofBlock> {
 
   Future<void> _loadTask() async {
     final taskId = widget.matchData['taskId'] as String? ?? '';
-    if (taskId.isEmpty) return;
+    if (taskId.isEmpty) {
+      return;
+    }
 
     try {
       final taskDoc = await FirebaseFirestore.instance

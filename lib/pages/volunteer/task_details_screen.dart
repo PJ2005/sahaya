@@ -1,11 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/task_model.dart';
 import '../../theme/sahaya_theme.dart';
 import 'active_task_screen.dart';
 import '../../utils/translator.dart';
+import '../../components/volunteer_team_list.dart';
 
 
 class TaskDetailsScreen extends StatefulWidget {
@@ -14,6 +16,7 @@ class TaskDetailsScreen extends StatefulWidget {
   final TaskModel initialTask;
   final int matchScore;
   final String whatToBring;
+  final String whyMatched;
   final bool isAlreadyAccepted;
 
   const TaskDetailsScreen({
@@ -23,6 +26,7 @@ class TaskDetailsScreen extends StatefulWidget {
     required this.initialTask,
     required this.matchScore,
     required this.whatToBring,
+    this.whyMatched = '',
     this.isAlreadyAccepted = false,
   });
 
@@ -48,13 +52,28 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Future<Map<String, dynamic>> _fetchTaskContext() async {
     if (widget.matchRecordId.isEmpty) {
+      final problemDoc = await FirebaseFirestore.instance.collection('problem_cards').doc(widget.initialTask.problemCardId).get();
+      
+      String ngoName = 'Coordinator', ngoEmail = '', ngoPhone = '';
+      if (problemDoc.exists && problemDoc.data() != null) {
+        final ngoId = problemDoc.data()!['ngoId'];
+        if (ngoId != null) {
+          final ngoDoc = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
+          if (ngoDoc.exists) { 
+            ngoName = ngoDoc['name'] ?? ngoName; 
+            ngoEmail = ngoDoc['email'] ?? ''; 
+            ngoPhone = ngoDoc['phone'] ?? ''; 
+          }
+        }
+      }
+
       return {
         'skills': <String>[],
-        'problem': <String, dynamic>{},
-        'match': <String, dynamic>{},
-        'ngoName': 'Coordinator',
-        'ngoEmail': '',
-        'ngoPhone': '',
+        'problem': problemDoc.exists ? problemDoc.data()! : {},
+        'match': {'whyMatched': widget.whyMatched},
+        'ngoName': ngoName,
+        'ngoEmail': ngoEmail,
+        'ngoPhone': ngoPhone,
       };
     }
 
@@ -92,19 +111,43 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Future<void> _acceptTask() async {
-    if (widget.matchRecordId.isEmpty) return;
     setState(() => _isAccepting = true);
     try {
-      final matchRef = FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId);
-      final taskRef = FirebaseFirestore.instance.collection('tasks').doc(widget.taskId);
-      final currentMatch = await matchRef.get();
-      if (!currentMatch.exists) throw Exception('Not found');
-      final currentStatus = currentMatch.data()!['status'] as String? ?? '';
-      if (currentStatus != 'open') throw Exception('Not available');
-      final volunteerId = currentMatch['volunteerId'];
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Not logged in');
+      final volunteerId = user.uid;
+
+      
+      String matchId = widget.matchRecordId;
       final batch = FirebaseFirestore.instance.batch();
-      batch.update(matchRef, {'status': 'accepted'});
-      batch.update(taskRef, {'assignedVolunteerIds': FieldValue.arrayUnion([volunteerId])});
+
+      if (matchId.isEmpty) {
+        // Discovery mode — create the match record on the fly
+        matchId = 'match_${widget.taskId}_$volunteerId';
+        final matchRef = FirebaseFirestore.instance.collection('match_records').doc(matchId);
+        
+        batch.set(matchRef, {
+          'id': matchId,
+          'volunteerId': volunteerId,
+          'taskId': widget.taskId,
+          'status': 'accepted',
+          'matchScore': widget.matchScore,
+          'whyMatched': widget.whyMatched.isNotEmpty ? widget.whyMatched : 'Discovery joining',
+          'createdAt': FieldValue.serverTimestamp(),
+          'distanceKm': 0, // Placeholder
+          'skillOverlap': 0, // Placeholder
+        });
+      } else {
+        // Pre-assigned mode — update existing record
+        final matchRef = FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId);
+        batch.update(matchRef, {'status': 'accepted'});
+      }
+      
+      final taskRef = FirebaseFirestore.instance.collection('tasks').doc(widget.taskId);
+      batch.update(taskRef, {
+        'assignedVolunteerIds': FieldValue.arrayUnion([volunteerId])
+      });
+      
       await batch.commit();
 
       if (mounted) {
@@ -112,7 +155,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         await Future.delayed(const Duration(milliseconds: 400));
         if (mounted) {
           Navigator.pushReplacement(context, MaterialPageRoute(
-            builder: (_) => ActiveTaskScreen(matchRecordId: widget.matchRecordId, task: widget.initialTask, ngoName: _ngoName, ngoPhone: _ngoPhone, ngoEmail: _ngoEmail),
+            builder: (_) => ActiveTaskScreen(
+              matchRecordId: matchId, 
+              task: widget.initialTask, 
+              ngoName: _ngoName, 
+              ngoPhone: _ngoPhone, 
+              ngoEmail: _ngoEmail
+            ),
           ));
         }
       }
@@ -238,6 +287,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       ),
 
                       const SizedBox(height: 28),
+                      
+                      VolunteerTeamList(
+                        volunteerIds: widget.initialTask.assignedVolunteerIds,
+                        title: 'Team so far',
+                      ),
+
+                      const SizedBox(height: 28),
 
                       // ─── Contact ───
                       T('Point of Contact', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700)),
@@ -300,14 +356,26 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               ],
             ),
           ),
-          bottomNavigationBar: _isAccepted
-              ? const SizedBox.shrink()
-              : SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: SizedBox(
-                      height: 56,
-                      child: ElevatedButton(
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                height: 56,
+                child: _isAccepted
+                    ? ElevatedButton.icon(
+                        onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(
+                          builder: (_) => ActiveTaskScreen(
+                            matchRecordId: widget.matchRecordId,
+                            task: widget.initialTask,
+                            ngoName: _ngoName,
+                            ngoPhone: _ngoPhone,
+                            ngoEmail: _ngoEmail,
+                          ),
+                        )),
+                        icon: const Icon(Icons.dashboard_rounded),
+                        label: T('Open Mission Dashboard', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+                      )
+                    : ElevatedButton(
                         onPressed: _isAccepting ? null : _acceptTask,
                         child: _isAccepting
                             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
@@ -317,9 +385,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                 T('Accept Mission', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
                               ]),
                       ),
-                    ),
-                  ),
-                ),
+              ),
+            ),
+          ),
         );
       },
     );

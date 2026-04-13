@@ -11,6 +11,7 @@ abstract class VolunteerProfile with _$VolunteerProfile {
   const factory VolunteerProfile({
     required String id,
     required String uid,
+    required String username,
     @GeoPointConverter() required GeoPoint locationGeoPoint,
     required double radiusKm,
     required List<String> skillTags,

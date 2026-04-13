@@ -5,10 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/problem_card.dart';
-import '../services/gemini_service.dart';
 import '../services/location_geocode_service.dart';
 import '../theme/sahaya_theme.dart';
 import 'review_queue_screen.dart';
+import '../services/gemini_service.dart';
 import '../utils/translator.dart';
 
 
@@ -35,13 +35,12 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
 
   // Manual Tab State
   final _formKey = GlobalKey<FormState>();
-  IssueType _issueType = IssueType.other;
+  IssueType _issueType = IssueType.sdg11_sustainable_cities_and_communities;
   SeverityLevel _severityLevel = SeverityLevel.medium;
   final _wardCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   final _affectedCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final _customCategoryCtrl = TextEditingController();
   bool _manualProcessing = false;
 
   @override
@@ -60,7 +59,6 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
     _cityCtrl.dispose();
     _affectedCtrl.dispose();
     _descCtrl.dispose();
-    _customCategoryCtrl.dispose();
     super.dispose();
   }
 
@@ -150,7 +148,7 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
         id: 'manual_${DateTime.now().millisecondsSinceEpoch}',
         ngoId: widget.ngoId,
         issueType: _issueType,
-        customIssueType: _issueType == IssueType.other ? _customCategoryCtrl.text.trim() : null,
+        customIssueType: null,
         locationWard: ward,
         locationCity: city,
         locationGeoPoint: geo,
@@ -329,26 +327,16 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<IssueType>(
-              value: _issueType,
-              decoration: InputDecoration(labelText: 'Classification', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              items: IssueType.values.map((v) => DropdownMenuItem(value: v, child: T(v.name.toUpperCase()))).toList(),
+              initialValue: _issueType,
+              decoration: InputDecoration(labelText: 'SDG Type', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+              items: IssueType.values
+                  .map((v) => DropdownMenuItem(value: v, child: T(v.label)))
+                  .toList(),
               onChanged: (v) => setState(() => _issueType = v!),
             ),
-            if (_issueType == IssueType.other) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _customCategoryCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Custom Category', 
-                  hintText: 'e.g., Toxic Waste, Pothole',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                validator: (v) => v!.trim().isEmpty ? 'Please specify custom category' : null,
-              ),
-            ],
             const SizedBox(height: 16),
             DropdownButtonFormField<SeverityLevel>(
-              value: _severityLevel,
+              initialValue: _severityLevel,
               decoration: InputDecoration(labelText: 'Severity', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
               items: SeverityLevel.values.map((v) => DropdownMenuItem(value: v, child: T(v.name.toUpperCase()))).toList(),
               onChanged: (v) => setState(() => _severityLevel = v!),

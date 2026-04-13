@@ -182,8 +182,9 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
     Color ringColor = Colors.green;
     if (widget.draftCard.confidenceScore < 0.70) {
       ringColor = Colors.red;
-    } else if (widget.draftCard.confidenceScore <= 0.85)
+    } else if (widget.draftCard.confidenceScore <= 0.85) {
       ringColor = Colors.orange;
+    }
 
     return AlertDialog(
       title: const T(
@@ -260,13 +261,13 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
             DropdownButtonFormField<IssueType>(
               initialValue: _issueType,
               decoration: const InputDecoration(
-                labelText: 'Verified Issue Type',
+                labelText: 'Verified SDG Type',
               ),
               items: IssueType.values
                   .map(
                     (v) => DropdownMenuItem(
                       value: v,
-                      child: T(v.name.toUpperCase()),
+                      child: T(v.label),
                     ),
                   )
                   .toList(),
@@ -335,12 +336,9 @@ class _ReviewCardDialogState extends State<ReviewCardDialog> {
                     onResult: (modified) {
                       setState(() {
                         if (modified['issueType'] != null) {
-                          final it = IssueType.values.where(
-                            (e) =>
-                                e.name ==
-                                modified['issueType'].toString().toLowerCase(),
+                          _issueType = IssueTypeX.fromString(
+                            modified['issueType'].toString(),
                           );
-                          if (it.isNotEmpty) _issueType = it.first;
                         }
                         if (modified['severityLevel'] != null) {
                           final sl = SeverityLevel.values.where(

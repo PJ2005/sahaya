@@ -9,17 +9,26 @@ part of 'task_model.dart';
 _TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => _TaskModel(
   id: json['id'] as String,
   problemCardId: json['problemCardId'] as String,
-  taskType: $enumDecode(_$TaskTypeEnumMap, json['taskType']),
+  taskType: $enumDecode(
+    _$TaskTypeEnumMap,
+    json['taskType'],
+    unknownValue: TaskType.other,
+  ),
   description: json['description'] as String? ?? 'No description provided',
   skillTags: (json['skillTags'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
   estimatedVolunteers: (json['estimatedVolunteers'] as num).toInt(),
   estimatedDurationHours: (json['estimatedDurationHours'] as num).toDouble(),
-  status: $enumDecode(_$TaskStatusEnumMap, json['status']),
+  status: $enumDecode(
+    _$TaskStatusEnumMap,
+    json['status'],
+    unknownValue: TaskStatus.open,
+  ),
   assignedVolunteerIds: (json['assignedVolunteerIds'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
+  isProofSubmitted: json['isProofSubmitted'] as bool? ?? false,
   locationWard: json['locationWard'] as String? ?? 'Unknown Ward',
   locationGeoPoint: const OptionalGeoPointConverter().fromJson(
     json['locationGeoPoint'] as GeoPoint?,
@@ -37,6 +46,7 @@ Map<String, dynamic> _$TaskModelToJson(_TaskModel instance) =>
       'estimatedDurationHours': instance.estimatedDurationHours,
       'status': _$TaskStatusEnumMap[instance.status]!,
       'assignedVolunteerIds': instance.assignedVolunteerIds,
+      'isProofSubmitted': instance.isProofSubmitted,
       'locationWard': instance.locationWard,
       'locationGeoPoint': const OptionalGeoPointConverter().toJson(
         instance.locationGeoPoint,
@@ -49,6 +59,7 @@ const _$TaskTypeEnumMap = {
   TaskType.logistics_coordination: 'logistics_coordination',
   TaskType.technical_repair: 'technical_repair',
   TaskType.awareness_session: 'awareness_session',
+  TaskType.physical_labor: 'physical_labor',
   TaskType.other: 'other',
 };
 

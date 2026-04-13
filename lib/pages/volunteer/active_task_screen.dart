@@ -16,14 +16,16 @@ import '../../components/success_overlay.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import '../../utils/translator.dart';
+import '../../components/volunteer_team_list.dart';
+import 'task_chat_screen.dart';
 
 
 class ActiveTaskScreen extends StatefulWidget {
   final String matchRecordId;
   final TaskModel task;
-  final String ngoName;
-  final String ngoPhone;
-  final String ngoEmail;
+  final String? ngoName;
+  final String? ngoPhone;
+  final String? ngoEmail;
   final String coordinatorPhone;
   final String status;
   final Map<String, dynamic>? proof;
@@ -33,9 +35,9 @@ class ActiveTaskScreen extends StatefulWidget {
     super.key,
     required this.matchRecordId,
     required this.task,
-    required this.ngoName,
-    required this.ngoPhone,
-    required this.ngoEmail,
+    this.ngoName,
+    this.ngoPhone,
+    this.ngoEmail,
     this.coordinatorPhone = '',
     this.status = 'accepted',
     this.proof,
@@ -47,6 +49,48 @@ class ActiveTaskScreen extends StatefulWidget {
 }
 
 class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
+  late Future<Map<String, String>> _ngoInfoFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _ngoInfoFuture = _fetchNgoInfo();
+  }
+
+  Future<Map<String, String>> _fetchNgoInfo() async {
+    // If all info is provided, return immediately
+    if (widget.ngoName != null && widget.ngoPhone != null && widget.ngoEmail != null) {
+      return {
+        'name': widget.ngoName!,
+        'phone': widget.ngoPhone!,
+        'email': widget.ngoEmail!,
+      };
+    }
+
+    try {
+      final problemDoc = await FirebaseFirestore.instance.collection('problem_cards').doc(widget.task.problemCardId).get();
+      if (!problemDoc.exists) throw 'Problem not found';
+      
+      final ngoId = problemDoc.data()?['ngoId'];
+      if (ngoId == null) throw 'NGO ID missing';
+
+      final ngoDoc = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
+      if (!ngoDoc.exists) throw 'NGO Profile not found';
+
+      return {
+        'name': ngoDoc['name'] ?? 'Coordinator',
+        'phone': ngoDoc['phone'] ?? '',
+        'email': ngoDoc['email'] ?? '',
+      };
+    } catch (e) {
+      return {
+        'name': widget.ngoName ?? 'Coordinator',
+        'phone': widget.ngoPhone ?? '',
+        'email': widget.ngoEmail ?? '',
+      };
+    }
+  }
+
   void _openDirections() async {
     final geo = widget.task.locationGeoPoint;
     if (geo != null) {
@@ -61,8 +105,8 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
     }
   }
 
-  void _callCoordinator() async {
-    final phone = widget.ngoPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+  void _callCoordinator(String? phoneInput) async {
+    final phone = (phoneInput ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
     if (phone.isEmpty) return;
     final url = Uri.parse('tel:$phone');
     try {
@@ -106,72 +150,115 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
     final bool isRejected = widget.status == 'proof_rejected';
     final bool isReadOnly = isCompleted || isSubmitted;
 
-    return Scaffold(
-      appBar: AppBar(title: T(isReadOnly ? 'Mission Summary' : 'Active Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w700))),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ─── Status Header ───
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isCompleted 
-                    ? [SahayaColors.emerald, const Color(0xFF065F46)]
-                    : (isDark
-                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                        : [const Color(0xFF111827), const Color(0xFF1F2937)]),
+    return FutureBuilder<Map<String, String>>(
+      future: _ngoInfoFuture,
+      builder: (context, ngoSnapshot) {
+        final ngoInfo = ngoSnapshot.data ?? {
+          'name': widget.ngoName ?? 'Coordinator',
+          'phone': widget.ngoPhone ?? '',
+          'email': widget.ngoEmail ?? '',
+        };
+
+        return StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('tasks').doc(widget.task.id).snapshots(),
+          builder: (context, taskSnapshot) {
+            final taskData = taskSnapshot.data?.data() as Map<String, dynamic>?;
+            final bool teamSubmitted = taskData?['isProofSubmitted'] ?? false;
+            final bool canSubmit = !isReadOnly && !teamSubmitted;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: T(isReadOnly ? 'Mission Summary' : 'Active Mission', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            actions: [
+              IconButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => TaskChatScreen(
+                    taskId: widget.task.id,
+                    taskTitle: widget.task.taskType.name.replaceAll('_', ' '),
+                    profileCollection: 'volunteer_profiles',
+                  ),
+                )),
+                icon: const Icon(Icons.forum_rounded),
+                tooltip: 'Coordination Chat',
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ─── Status Header ───
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isCompleted 
+                        ? [SahayaColors.emerald, const Color(0xFF065F46)]
+                        : (isDark
+                            ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                            : [const Color(0xFF111827), const Color(0xFF1F2937)]),
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [sahayaCardShadow(context)],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        isCompleted
+                            ? Icons.verified_rounded
+                            : (isSubmitted || teamSubmitted
+                                  ? Icons.hourglass_top_rounded
+                                  : (isRejected
+                                        ? Icons.refresh_rounded
+                                        : Icons.run_circle_rounded)),
+                        size: 56,
+                        color: (isCompleted) ? Colors.white : cs.primary,
+                      ),
+                      const SizedBox(height: 16),
+                      T(
+                        isCompleted
+                            ? 'Mission Completed'
+                            : (isSubmitted
+                                  ? 'Awaiting Review'
+                                  : (teamSubmitted
+                                      ? 'Team member submitted proof'
+                                      : (isRejected
+                                            ? 'Proof needs revision'
+                                            : 'Mission is active'))),
+                        style: GoogleFonts.inter(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      T(
+                        isCompleted
+                            ? 'Thank you for your incredible service!'
+                            : (isSubmitted
+                                  ? 'We\'ll notify you once the NGO reviews it.'
+                                  : (teamSubmitted
+                                      ? 'Submission is pending NGO approval.'
+                                      : (isRejected
+                                            ? 'Please review the NGO feedback and upload updated proof.'
+                                            : 'Head to the location and complete the task.'))),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [sahayaCardShadow(context)],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    isCompleted
-                        ? Icons.verified_rounded
-                        : (isSubmitted
-                              ? Icons.hourglass_top_rounded
-                              : (isRejected
-                                    ? Icons.refresh_rounded
-                                    : Icons.run_circle_rounded)),
-                    size: 56,
-                    color: isCompleted ? Colors.white : cs.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  T(
-                    isCompleted
-                        ? 'Mission Completed'
-                        : (isSubmitted
-                              ? 'Awaiting Review'
-                              : (isRejected
-                                    ? 'Proof needs revision'
-                                    : 'Mission is active')),
-                    style: GoogleFonts.inter(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  T(
-                    isCompleted
-                        ? 'Thank you for your incredible service!'
-                        : (isSubmitted
-                              ? 'We\'ll notify you once the NGO reviews it.'
-                              : (isRejected
-                                    ? 'Please review the NGO feedback and upload updated proof.'
-                                    : 'Head to the location and complete the task.')),
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
+
+            const SizedBox(height: 28),
+
+            VolunteerTeamList(
+              volunteerIds: List<String>.from(taskData?['assignedVolunteerIds'] ?? widget.task.assignedVolunteerIds),
+              title: 'Your Team',
             ),
 
             const SizedBox(height: 28),
@@ -222,7 +309,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                 children: [
                   Expanded(child: _actionCard(Icons.navigation_rounded, 'Directions', cs.primary, _openDirections, isDark)),
                   const SizedBox(width: 12),
-                  Expanded(child: _actionCard(Icons.call_rounded, 'Call NGO', SahayaColors.amber, _callCoordinator, isDark)),
+                  Expanded(child: _actionCard(Icons.call_rounded, 'Call NGO', SahayaColors.amber, () => _callCoordinator(ngoInfo['phone']), isDark)),
                 ],
               ),
               const SizedBox(height: 24),
@@ -245,11 +332,11 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                       CircleAvatar(radius: 24, backgroundColor: cs.primary.withValues(alpha: 0.1), child: Icon(Icons.person_rounded, color: cs.primary)),
                       const SizedBox(width: 14),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        T(widget.ngoName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                        T(widget.ngoPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                        T(ngoInfo['name'] ?? 'Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        T(ngoInfo['phone'] ?? '', style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
                       ])),
                       if (!isReadOnly)
-                        IconButton(onPressed: _callCoordinator, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
+                        IconButton(onPressed: () => _callCoordinator(ngoInfo['phone']), icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
                     ],
                   ),
                   if (widget.coordinatorPhone.isNotEmpty) ...[
@@ -290,18 +377,22 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
               child: SizedBox(
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: () {
+                  onPressed: !canSubmit ? null : () {
                     HapticFeedback.lightImpact();
                     _showProofSheet();
                   },
                   icon: const Icon(Icons.camera_alt_rounded),
-                  label: T('Submit proof', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+                  label: T(teamSubmitted ? 'Submitted by team' : 'Submit proof', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
             ),
           ),
+        );
+      },
     );
-  }
+  },
+);
+}
 
   Widget _buildProofDisplay(BuildContext context, Map<String, dynamic> proof) {
     final cs = Theme.of(context).colorScheme;
@@ -511,18 +602,38 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
       final preset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
       final cloudinary = CloudinaryPublic(cloudName, preset, cache: false);
 
+      // Check if already submitted by team just before uploading
+      final preCheck = await FirebaseFirestore.instance.collection('tasks').doc(widget.task.id).get();
+      if (preCheck.exists && (preCheck.data()?['isProofSubmitted'] ?? false)) {
+        throw Exception('A team member already submitted proof just now.');
+      }
+
       List<String> urls = [];
       for (var img in _images) {
         final resp = await cloudinary.uploadFile(CloudinaryFile.fromFile(img.path, resourceType: CloudinaryResourceType.Image));
         urls.add(resp.secureUrl);
       }
 
-      await FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId).update({
-        'proof': {'photoUrls': urls, 'secureUrls': urls, 'note': _noteCtrl.text.trim(), 'submittedAt': FieldValue.serverTimestamp()},
-        'status': 'proof_submitted',
-        'aiVerificationLabel': FieldValue.delete(),
-        'aiVerificationReason': FieldValue.delete(),
-        'aiVerifiedAt': FieldValue.delete(),
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final taskRef = FirebaseFirestore.instance.collection('tasks').doc(widget.task.id);
+        final matchRef = FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId);
+        
+        final taskSnap = await transaction.get(taskRef);
+        if (taskSnap.exists && (taskSnap.data()?['isProofSubmitted'] ?? false)) {
+          throw Exception('A team member already submitted proof while you were uploading.');
+        }
+
+        transaction.update(matchRef, {
+          'proof': {'photoUrls': urls, 'secureUrls': urls, 'note': _noteCtrl.text.trim(), 'submittedAt': FieldValue.serverTimestamp()},
+          'status': 'proof_submitted',
+          'aiVerificationLabel': FieldValue.delete(),
+          'aiVerificationReason': FieldValue.delete(),
+          'aiVerifiedAt': FieldValue.delete(),
+        });
+
+        transaction.update(taskRef, {
+          'isProofSubmitted': true,
+        });
       });
 
       final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://10.0.2.2:5000';

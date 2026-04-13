@@ -12,6 +12,7 @@ enum TaskType {
   logistics_coordination,
   technical_repair,
   awareness_session,
+  physical_labor,
   other,
 }
 
@@ -23,13 +24,14 @@ abstract class TaskModel with _$TaskModel {
   const factory TaskModel({
     required String id,
     required String problemCardId,
-    required TaskType taskType,
+    @JsonKey(unknownEnumValue: TaskType.other) required TaskType taskType,
     @Default('No description provided') String description,
     required List<String> skillTags,
     required int estimatedVolunteers,
     required double estimatedDurationHours,
-    required TaskStatus status,
+    @JsonKey(unknownEnumValue: TaskStatus.open) required TaskStatus status,
     required List<String> assignedVolunteerIds,
+    @Default(false) bool isProofSubmitted,
     @Default('Unknown Ward') String locationWard,
     @OptionalGeoPointConverter() GeoPoint? locationGeoPoint,
   }) = _TaskModel;

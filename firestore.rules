@@ -62,13 +62,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.id;
     }
     match /volunteer_profiles/{profileId} {
-      allow read, update, delete: if isAuthenticated() && request.auth.uid == profileId;
+      allow read: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && request.auth.uid == profileId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
     }
 
     match /match_records/{matchId} {
       allow read: if isVolunteerForMatch() || isNgoForMatch();
-      allow create: if false;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.volunteerId;
       allow update: if isVolunteerForMatch() || isNgoForMatch();
       allow delete: if isNgoForMatch();
     }
@@ -86,6 +87,15 @@ service cloud.firestore {
     match /ngo_notifications/{notificationId} {
       allow read, update, delete: if isAuthenticated() && request.auth.uid == resource.data.ngoId;
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ngoId;
+    }
+
+    match /task_chats/{taskId} {
+      match /messages/{messageId} {
+        allow read, create: if isAuthenticated() && (
+          request.auth.uid in get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVolunteerIds ||
+          request.auth.uid == ngoIdByTask(taskId)
+        );
+      }
     }
   }
 }

@@ -78,7 +78,7 @@ class ReviewQueueScreen extends StatelessWidget {
       return ProblemCard(
         id: doc.id,
         ngoId: ngoId,
-        issueType: IssueType.other,
+        issueType: IssueType.sdg11_sustainable_cities_and_communities,
         locationWard: 'Manual Review',
         locationCity: 'Required',
         locationGeoPoint: const GeoPoint(0, 0),

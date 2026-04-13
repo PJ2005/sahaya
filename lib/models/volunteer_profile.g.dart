@@ -10,6 +10,7 @@ _VolunteerProfile _$VolunteerProfileFromJson(Map<String, dynamic> json) =>
     _VolunteerProfile(
       id: json['id'] as String,
       uid: json['uid'] as String,
+      username: json['username'] as String,
       locationGeoPoint: const GeoPointConverter().fromJson(
         json['locationGeoPoint'] as GeoPoint,
       ),
@@ -32,6 +33,7 @@ Map<String, dynamic> _$VolunteerProfileToJson(_VolunteerProfile instance) =>
     <String, dynamic>{
       'id': instance.id,
       'uid': instance.uid,
+      'username': instance.username,
       'locationGeoPoint': const GeoPointConverter().toJson(
         instance.locationGeoPoint,
       ),

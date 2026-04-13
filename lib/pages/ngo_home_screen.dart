@@ -12,21 +12,7 @@ import 'ngo_create_problem_screen.dart';
 import 'proof_review_screen.dart';
 
 String _sdgTagForIssue(IssueType issue) {
-  switch (issue) {
-    case IssueType.water_access:
-    case IssueType.sanitation:
-      return 'SDG 6';
-    case IssueType.education:
-      return 'SDG 4';
-    case IssueType.nutrition:
-      return 'SDG 2';
-    case IssueType.healthcare:
-      return 'SDG 3';
-    case IssueType.livelihood:
-      return 'SDG 8';
-    case IssueType.other:
-      return 'SDG 11';
-  }
+  return issue.sdgTag;
 }
 
 class NgoHomeScreen extends StatelessWidget {
@@ -36,14 +22,11 @@ class NgoHomeScreen extends StatelessWidget {
   ProblemCard _safeProblemCardFromDoc(QueryDocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
-    final issueTypeName = (data['issueType'] as String?) ?? 'other';
+    final issueTypeName = (data['issueType'] as String?) ?? 'sdg11_sustainable_cities_and_communities';
     final severityName = (data['severityLevel'] as String?) ?? 'medium';
     final statusName = (data['status'] as String?) ?? 'approved';
 
-    final issueType = IssueType.values.firstWhere(
-      (v) => v.name == issueTypeName,
-      orElse: () => IssueType.other,
-    );
+    final issueType = IssueTypeX.fromString(issueTypeName);
     final severity = SeverityLevel.values.firstWhere(
       (v) => v.name == severityName,
       orElse: () => SeverityLevel.medium,

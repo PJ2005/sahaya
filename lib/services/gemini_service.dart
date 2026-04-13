@@ -132,7 +132,7 @@ class GeminiService {
     int nodeIndex = 0;
     for (var struct in jsonList) {
       String issueStr = struct['issueType']?.toString().toLowerCase() ?? '';
-      IssueType iType = IssueType.values.firstWhere((e) => e.name == issueStr, orElse: () => IssueType.other);
+      IssueType iType = IssueTypeX.fromString(issueStr);
 
       String severityStr = struct['severityLevel']?.toString().toLowerCase() ?? '';
       SeverityLevel sLevel = SeverityLevel.values.firstWhere((e) => e.name == severityStr, orElse: () => SeverityLevel.low);

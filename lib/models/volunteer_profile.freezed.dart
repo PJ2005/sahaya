@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$VolunteerProfile {
 
- String get id; String get uid;@GeoPointConverter() GeoPoint get locationGeoPoint; double get radiusKm; List<String> get skillTags; String get languagePref; bool get availabilityWindowActive; bool get isPartialAvailability;@TimestampConverter() DateTime get availabilityUpdatedAt; String? get fcmToken; int get tasksCompleted; int get trustScore;
+ String get id; String get uid; String get username;@GeoPointConverter() GeoPoint get locationGeoPoint; double get radiusKm; List<String> get skillTags; String get languagePref; bool get availabilityWindowActive; bool get isPartialAvailability;@TimestampConverter() DateTime get availabilityUpdatedAt; String? get fcmToken; int get tasksCompleted; int get trustScore;
 /// Create a copy of VolunteerProfile
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $VolunteerProfileCopyWith<VolunteerProfile> get copyWith => _$VolunteerProfileCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is VolunteerProfile&&(identical(other.id, id) || other.id == id)&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint)&&(identical(other.radiusKm, radiusKm) || other.radiusKm == radiusKm)&&const DeepCollectionEquality().equals(other.skillTags, skillTags)&&(identical(other.languagePref, languagePref) || other.languagePref == languagePref)&&(identical(other.availabilityWindowActive, availabilityWindowActive) || other.availabilityWindowActive == availabilityWindowActive)&&(identical(other.isPartialAvailability, isPartialAvailability) || other.isPartialAvailability == isPartialAvailability)&&(identical(other.availabilityUpdatedAt, availabilityUpdatedAt) || other.availabilityUpdatedAt == availabilityUpdatedAt)&&(identical(other.fcmToken, fcmToken) || other.fcmToken == fcmToken)&&(identical(other.tasksCompleted, tasksCompleted) || other.tasksCompleted == tasksCompleted)&&(identical(other.trustScore, trustScore) || other.trustScore == trustScore));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is VolunteerProfile&&(identical(other.id, id) || other.id == id)&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.username, username) || other.username == username)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint)&&(identical(other.radiusKm, radiusKm) || other.radiusKm == radiusKm)&&const DeepCollectionEquality().equals(other.skillTags, skillTags)&&(identical(other.languagePref, languagePref) || other.languagePref == languagePref)&&(identical(other.availabilityWindowActive, availabilityWindowActive) || other.availabilityWindowActive == availabilityWindowActive)&&(identical(other.isPartialAvailability, isPartialAvailability) || other.isPartialAvailability == isPartialAvailability)&&(identical(other.availabilityUpdatedAt, availabilityUpdatedAt) || other.availabilityUpdatedAt == availabilityUpdatedAt)&&(identical(other.fcmToken, fcmToken) || other.fcmToken == fcmToken)&&(identical(other.tasksCompleted, tasksCompleted) || other.tasksCompleted == tasksCompleted)&&(identical(other.trustScore, trustScore) || other.trustScore == trustScore));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,uid,locationGeoPoint,radiusKm,const DeepCollectionEquality().hash(skillTags),languagePref,availabilityWindowActive,isPartialAvailability,availabilityUpdatedAt,fcmToken,tasksCompleted,trustScore);
+int get hashCode => Object.hash(runtimeType,id,uid,username,locationGeoPoint,radiusKm,const DeepCollectionEquality().hash(skillTags),languagePref,availabilityWindowActive,isPartialAvailability,availabilityUpdatedAt,fcmToken,tasksCompleted,trustScore);
 
 @override
 String toString() {
-  return 'VolunteerProfile(id: $id, uid: $uid, locationGeoPoint: $locationGeoPoint, radiusKm: $radiusKm, skillTags: $skillTags, languagePref: $languagePref, availabilityWindowActive: $availabilityWindowActive, isPartialAvailability: $isPartialAvailability, availabilityUpdatedAt: $availabilityUpdatedAt, fcmToken: $fcmToken, tasksCompleted: $tasksCompleted, trustScore: $trustScore)';
+  return 'VolunteerProfile(id: $id, uid: $uid, username: $username, locationGeoPoint: $locationGeoPoint, radiusKm: $radiusKm, skillTags: $skillTags, languagePref: $languagePref, availabilityWindowActive: $availabilityWindowActive, isPartialAvailability: $isPartialAvailability, availabilityUpdatedAt: $availabilityUpdatedAt, fcmToken: $fcmToken, tasksCompleted: $tasksCompleted, trustScore: $trustScore)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $VolunteerProfileCopyWith<$Res>  {
   factory $VolunteerProfileCopyWith(VolunteerProfile value, $Res Function(VolunteerProfile) _then) = _$VolunteerProfileCopyWithImpl;
 @useResult
 $Res call({
- String id, String uid,@GeoPointConverter() GeoPoint locationGeoPoint, double radiusKm, List<String> skillTags, String languagePref, bool availabilityWindowActive, bool isPartialAvailability,@TimestampConverter() DateTime availabilityUpdatedAt, String? fcmToken, int tasksCompleted, int trustScore
+ String id, String uid, String username,@GeoPointConverter() GeoPoint locationGeoPoint, double radiusKm, List<String> skillTags, String languagePref, bool availabilityWindowActive, bool isPartialAvailability,@TimestampConverter() DateTime availabilityUpdatedAt, String? fcmToken, int tasksCompleted, int trustScore
 });
 
 
@@ -65,10 +65,11 @@ class _$VolunteerProfileCopyWithImpl<$Res>
 
 /// Create a copy of VolunteerProfile
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? uid = null,Object? locationGeoPoint = null,Object? radiusKm = null,Object? skillTags = null,Object? languagePref = null,Object? availabilityWindowActive = null,Object? isPartialAvailability = null,Object? availabilityUpdatedAt = null,Object? fcmToken = freezed,Object? tasksCompleted = null,Object? trustScore = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? uid = null,Object? username = null,Object? locationGeoPoint = null,Object? radiusKm = null,Object? skillTags = null,Object? languagePref = null,Object? availabilityWindowActive = null,Object? isPartialAvailability = null,Object? availabilityUpdatedAt = null,Object? fcmToken = freezed,Object? tasksCompleted = null,Object? trustScore = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,uid: null == uid ? _self.uid : uid // ignore: cast_nullable_to_non_nullable
+as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,locationGeoPoint: null == locationGeoPoint ? _self.locationGeoPoint : locationGeoPoint // ignore: cast_nullable_to_non_nullable
 as GeoPoint,radiusKm: null == radiusKm ? _self.radiusKm : radiusKm // ignore: cast_nullable_to_non_nullable
 as double,skillTags: null == skillTags ? _self.skillTags : skillTags // ignore: cast_nullable_to_non_nullable
@@ -164,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String uid, @GeoPointConverter()  GeoPoint locationGeoPoint,  double radiusKm,  List<String> skillTags,  String languagePref,  bool availabilityWindowActive,  bool isPartialAvailability, @TimestampConverter()  DateTime availabilityUpdatedAt,  String? fcmToken,  int tasksCompleted,  int trustScore)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String uid,  String username, @GeoPointConverter()  GeoPoint locationGeoPoint,  double radiusKm,  List<String> skillTags,  String languagePref,  bool availabilityWindowActive,  bool isPartialAvailability, @TimestampConverter()  DateTime availabilityUpdatedAt,  String? fcmToken,  int tasksCompleted,  int trustScore)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _VolunteerProfile() when $default != null:
-return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.skillTags,_that.languagePref,_that.availabilityWindowActive,_that.isPartialAvailability,_that.availabilityUpdatedAt,_that.fcmToken,_that.tasksCompleted,_that.trustScore);case _:
+return $default(_that.id,_that.uid,_that.username,_that.locationGeoPoint,_that.radiusKm,_that.skillTags,_that.languagePref,_that.availabilityWindowActive,_that.isPartialAvailability,_that.availabilityUpdatedAt,_that.fcmToken,_that.tasksCompleted,_that.trustScore);case _:
   return orElse();
 
 }
@@ -185,10 +186,10 @@ return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String uid, @GeoPointConverter()  GeoPoint locationGeoPoint,  double radiusKm,  List<String> skillTags,  String languagePref,  bool availabilityWindowActive,  bool isPartialAvailability, @TimestampConverter()  DateTime availabilityUpdatedAt,  String? fcmToken,  int tasksCompleted,  int trustScore)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String uid,  String username, @GeoPointConverter()  GeoPoint locationGeoPoint,  double radiusKm,  List<String> skillTags,  String languagePref,  bool availabilityWindowActive,  bool isPartialAvailability, @TimestampConverter()  DateTime availabilityUpdatedAt,  String? fcmToken,  int tasksCompleted,  int trustScore)  $default,) {final _that = this;
 switch (_that) {
 case _VolunteerProfile():
-return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.skillTags,_that.languagePref,_that.availabilityWindowActive,_that.isPartialAvailability,_that.availabilityUpdatedAt,_that.fcmToken,_that.tasksCompleted,_that.trustScore);case _:
+return $default(_that.id,_that.uid,_that.username,_that.locationGeoPoint,_that.radiusKm,_that.skillTags,_that.languagePref,_that.availabilityWindowActive,_that.isPartialAvailability,_that.availabilityUpdatedAt,_that.fcmToken,_that.tasksCompleted,_that.trustScore);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -205,10 +206,10 @@ return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String uid, @GeoPointConverter()  GeoPoint locationGeoPoint,  double radiusKm,  List<String> skillTags,  String languagePref,  bool availabilityWindowActive,  bool isPartialAvailability, @TimestampConverter()  DateTime availabilityUpdatedAt,  String? fcmToken,  int tasksCompleted,  int trustScore)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String uid,  String username, @GeoPointConverter()  GeoPoint locationGeoPoint,  double radiusKm,  List<String> skillTags,  String languagePref,  bool availabilityWindowActive,  bool isPartialAvailability, @TimestampConverter()  DateTime availabilityUpdatedAt,  String? fcmToken,  int tasksCompleted,  int trustScore)?  $default,) {final _that = this;
 switch (_that) {
 case _VolunteerProfile() when $default != null:
-return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.skillTags,_that.languagePref,_that.availabilityWindowActive,_that.isPartialAvailability,_that.availabilityUpdatedAt,_that.fcmToken,_that.tasksCompleted,_that.trustScore);case _:
+return $default(_that.id,_that.uid,_that.username,_that.locationGeoPoint,_that.radiusKm,_that.skillTags,_that.languagePref,_that.availabilityWindowActive,_that.isPartialAvailability,_that.availabilityUpdatedAt,_that.fcmToken,_that.tasksCompleted,_that.trustScore);case _:
   return null;
 
 }
@@ -220,11 +221,12 @@ return $default(_that.id,_that.uid,_that.locationGeoPoint,_that.radiusKm,_that.s
 @JsonSerializable()
 
 class _VolunteerProfile extends VolunteerProfile {
-  const _VolunteerProfile({required this.id, required this.uid, @GeoPointConverter() required this.locationGeoPoint, required this.radiusKm, required final  List<String> skillTags, required this.languagePref, required this.availabilityWindowActive, this.isPartialAvailability = false, @TimestampConverter() required this.availabilityUpdatedAt, this.fcmToken, this.tasksCompleted = 0, this.trustScore = 0}): _skillTags = skillTags,super._();
+  const _VolunteerProfile({required this.id, required this.uid, required this.username, @GeoPointConverter() required this.locationGeoPoint, required this.radiusKm, required final  List<String> skillTags, required this.languagePref, required this.availabilityWindowActive, this.isPartialAvailability = false, @TimestampConverter() required this.availabilityUpdatedAt, this.fcmToken, this.tasksCompleted = 0, this.trustScore = 0}): _skillTags = skillTags,super._();
   factory _VolunteerProfile.fromJson(Map<String, dynamic> json) => _$VolunteerProfileFromJson(json);
 
 @override final  String id;
 @override final  String uid;
+@override final  String username;
 @override@GeoPointConverter() final  GeoPoint locationGeoPoint;
 @override final  double radiusKm;
  final  List<String> _skillTags;
@@ -255,16 +257,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _VolunteerProfile&&(identical(other.id, id) || other.id == id)&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint)&&(identical(other.radiusKm, radiusKm) || other.radiusKm == radiusKm)&&const DeepCollectionEquality().equals(other._skillTags, _skillTags)&&(identical(other.languagePref, languagePref) || other.languagePref == languagePref)&&(identical(other.availabilityWindowActive, availabilityWindowActive) || other.availabilityWindowActive == availabilityWindowActive)&&(identical(other.isPartialAvailability, isPartialAvailability) || other.isPartialAvailability == isPartialAvailability)&&(identical(other.availabilityUpdatedAt, availabilityUpdatedAt) || other.availabilityUpdatedAt == availabilityUpdatedAt)&&(identical(other.fcmToken, fcmToken) || other.fcmToken == fcmToken)&&(identical(other.tasksCompleted, tasksCompleted) || other.tasksCompleted == tasksCompleted)&&(identical(other.trustScore, trustScore) || other.trustScore == trustScore));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _VolunteerProfile&&(identical(other.id, id) || other.id == id)&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.username, username) || other.username == username)&&(identical(other.locationGeoPoint, locationGeoPoint) || other.locationGeoPoint == locationGeoPoint)&&(identical(other.radiusKm, radiusKm) || other.radiusKm == radiusKm)&&const DeepCollectionEquality().equals(other._skillTags, _skillTags)&&(identical(other.languagePref, languagePref) || other.languagePref == languagePref)&&(identical(other.availabilityWindowActive, availabilityWindowActive) || other.availabilityWindowActive == availabilityWindowActive)&&(identical(other.isPartialAvailability, isPartialAvailability) || other.isPartialAvailability == isPartialAvailability)&&(identical(other.availabilityUpdatedAt, availabilityUpdatedAt) || other.availabilityUpdatedAt == availabilityUpdatedAt)&&(identical(other.fcmToken, fcmToken) || other.fcmToken == fcmToken)&&(identical(other.tasksCompleted, tasksCompleted) || other.tasksCompleted == tasksCompleted)&&(identical(other.trustScore, trustScore) || other.trustScore == trustScore));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,uid,locationGeoPoint,radiusKm,const DeepCollectionEquality().hash(_skillTags),languagePref,availabilityWindowActive,isPartialAvailability,availabilityUpdatedAt,fcmToken,tasksCompleted,trustScore);
+int get hashCode => Object.hash(runtimeType,id,uid,username,locationGeoPoint,radiusKm,const DeepCollectionEquality().hash(_skillTags),languagePref,availabilityWindowActive,isPartialAvailability,availabilityUpdatedAt,fcmToken,tasksCompleted,trustScore);
 
 @override
 String toString() {
-  return 'VolunteerProfile(id: $id, uid: $uid, locationGeoPoint: $locationGeoPoint, radiusKm: $radiusKm, skillTags: $skillTags, languagePref: $languagePref, availabilityWindowActive: $availabilityWindowActive, isPartialAvailability: $isPartialAvailability, availabilityUpdatedAt: $availabilityUpdatedAt, fcmToken: $fcmToken, tasksCompleted: $tasksCompleted, trustScore: $trustScore)';
+  return 'VolunteerProfile(id: $id, uid: $uid, username: $username, locationGeoPoint: $locationGeoPoint, radiusKm: $radiusKm, skillTags: $skillTags, languagePref: $languagePref, availabilityWindowActive: $availabilityWindowActive, isPartialAvailability: $isPartialAvailability, availabilityUpdatedAt: $availabilityUpdatedAt, fcmToken: $fcmToken, tasksCompleted: $tasksCompleted, trustScore: $trustScore)';
 }
 
 
@@ -275,7 +277,7 @@ abstract mixin class _$VolunteerProfileCopyWith<$Res> implements $VolunteerProfi
   factory _$VolunteerProfileCopyWith(_VolunteerProfile value, $Res Function(_VolunteerProfile) _then) = __$VolunteerProfileCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String uid,@GeoPointConverter() GeoPoint locationGeoPoint, double radiusKm, List<String> skillTags, String languagePref, bool availabilityWindowActive, bool isPartialAvailability,@TimestampConverter() DateTime availabilityUpdatedAt, String? fcmToken, int tasksCompleted, int trustScore
+ String id, String uid, String username,@GeoPointConverter() GeoPoint locationGeoPoint, double radiusKm, List<String> skillTags, String languagePref, bool availabilityWindowActive, bool isPartialAvailability,@TimestampConverter() DateTime availabilityUpdatedAt, String? fcmToken, int tasksCompleted, int trustScore
 });
 
 
@@ -292,10 +294,11 @@ class __$VolunteerProfileCopyWithImpl<$Res>
 
 /// Create a copy of VolunteerProfile
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? uid = null,Object? locationGeoPoint = null,Object? radiusKm = null,Object? skillTags = null,Object? languagePref = null,Object? availabilityWindowActive = null,Object? isPartialAvailability = null,Object? availabilityUpdatedAt = null,Object? fcmToken = freezed,Object? tasksCompleted = null,Object? trustScore = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? uid = null,Object? username = null,Object? locationGeoPoint = null,Object? radiusKm = null,Object? skillTags = null,Object? languagePref = null,Object? availabilityWindowActive = null,Object? isPartialAvailability = null,Object? availabilityUpdatedAt = null,Object? fcmToken = freezed,Object? tasksCompleted = null,Object? trustScore = null,}) {
   return _then(_VolunteerProfile(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,uid: null == uid ? _self.uid : uid // ignore: cast_nullable_to_non_nullable
+as String,username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,locationGeoPoint: null == locationGeoPoint ? _self.locationGeoPoint : locationGeoPoint // ignore: cast_nullable_to_non_nullable
 as GeoPoint,radiusKm: null == radiusKm ? _self.radiusKm : radiusKm // ignore: cast_nullable_to_non_nullable
 as double,skillTags: null == skillTags ? _self._skillTags : skillTags // ignore: cast_nullable_to_non_nullable
