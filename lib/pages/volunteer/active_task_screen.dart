@@ -49,10 +49,23 @@ class ActiveTaskScreen extends StatefulWidget {
 }
 
 class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
+  static const String _ngoDummyPhone = '+919876543210';
+  static const String _coordinatorDummyPhone = '+919123456789';
+
   late Future<Map<String, String>> _ngoInfoFuture;
 
   String _cleanPhone(String? raw) {
     return (raw ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+  }
+
+  String _effectiveNgoPhone(String? raw) {
+    final phone = _cleanPhone(raw);
+    return phone.isEmpty ? _ngoDummyPhone : phone;
+  }
+
+  String _effectiveCoordinatorPhone(String? raw) {
+    final phone = _cleanPhone(raw);
+    return phone.isEmpty ? _coordinatorDummyPhone : phone;
   }
 
   @override
@@ -119,8 +132,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   }
 
   void _callCoordinator(String? phoneInput) async {
-    final phone = _cleanPhone(phoneInput);
-    if (phone.isEmpty) return;
+    final phone = _effectiveNgoPhone(phoneInput);
     final url = Uri.parse('tel:$phone');
     try {
       await launchUrl(url);
@@ -128,8 +140,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   }
 
   void _callCoordinatorDirect() async {
-    final phone = _cleanPhone(widget.coordinatorPhone);
-    if (phone.isEmpty) return;
+    final phone = _effectiveCoordinatorPhone(widget.coordinatorPhone);
     final url = Uri.parse('tel:$phone');
     try {
       await launchUrl(url);
@@ -346,27 +357,25 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
                       const SizedBox(width: 14),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         T(ngoInfo['name'] ?? 'Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                        T(ngoInfo['phone'] ?? '', style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                        T(_effectiveNgoPhone(ngoInfo['phone']), style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
                       ])),
                       if (!isReadOnly)
                         IconButton(onPressed: () => _callCoordinator(ngoInfo['phone']), icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
                     ],
                   ),
-                  if (widget.coordinatorPhone.isNotEmpty) ...[
-                    const Divider(height: 20),
-                    Row(
-                      children: [
-                        CircleAvatar(radius: 24, backgroundColor: SahayaColors.amber.withValues(alpha: 0.1), child: const Icon(Icons.support_agent_rounded, color: SahayaColors.amber)),
-                        const SizedBox(width: 14),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          T('Field Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                          T(widget.coordinatorPhone, style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
-                        ])),
-                        if (!isReadOnly)
-                          IconButton(onPressed: _callCoordinatorDirect, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
-                      ],
-                    ),
-                  ],
+                  const Divider(height: 20),
+                  Row(
+                    children: [
+                      CircleAvatar(radius: 24, backgroundColor: SahayaColors.amber.withValues(alpha: 0.1), child: const Icon(Icons.support_agent_rounded, color: SahayaColors.amber)),
+                      const SizedBox(width: 14),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        T('Field Coordinator', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        T(_effectiveCoordinatorPhone(widget.coordinatorPhone), style: GoogleFonts.inter(fontSize: 13, color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted)),
+                      ])),
+                      if (!isReadOnly)
+                        IconButton(onPressed: _callCoordinatorDirect, icon: const Icon(Icons.call_rounded, color: SahayaColors.amber)),
+                    ],
+                  ),
                 ],
               ),
             ),

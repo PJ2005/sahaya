@@ -355,7 +355,7 @@ class _ProofRejectedTile extends StatelessWidget {
     }
 
     final matchSnap = await FirebaseFirestore.instance.collection('match_records').doc(matchRecordId).get();
-    final matchMap = matchSnap.data() as Map<String, dynamic>?;
+    final matchMap = matchSnap.data();
 
     final taskMap = taskSnap.data() as Map<String, dynamic>;
     taskMap['id'] = taskSnap.id;
