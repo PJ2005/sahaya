@@ -27,6 +27,10 @@ class VolunteerNotificationsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           _UnreadChatsSection(uid: uid),
           const SizedBox(height: 18),
+          _SectionTitle(title: 'Resubmission Required'),
+          const SizedBox(height: 8),
+          _ProofRejectedSection(uid: uid),
+          const SizedBox(height: 18),
           _SectionTitle(title: 'Proof Review Pending'),
           const SizedBox(height: 8),
           _ProofPendingSection(uid: uid),
@@ -240,7 +244,6 @@ class _ProofPendingSection extends StatelessWidget {
       stream: FirebaseFirestore.instance
           .collection('match_records')
           .where('volunteerId', isEqualTo: uid)
-          .where('status', isEqualTo: 'proof_submitted')
           .snapshots(),
       builder: (context, matchSnap) {
         if (matchSnap.connectionState == ConnectionState.waiting) {
@@ -250,7 +253,10 @@ class _ProofPendingSection extends StatelessWidget {
           return const _EmptyCard(message: 'Unable to load proof review updates right now.');
         }
 
-        final docs = matchSnap.data?.docs ?? const [];
+        final docs = (matchSnap.data?.docs ?? const []).where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['status'] == 'proof_submitted';
+        }).toList();
         if (docs.isEmpty) {
           return const _EmptyCard(message: 'No proof reviews pending.');
         }
@@ -267,6 +273,145 @@ class _ProofPendingSection extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ProofRejectedSection extends StatelessWidget {
+  final String uid;
+
+  const _ProofRejectedSection({required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('volunteer_notifications')
+          .where('volunteerId', isEqualTo: uid)
+          .snapshots(),
+      builder: (context, notifSnap) {
+        if (notifSnap.connectionState == ConnectionState.waiting) {
+          return const _LoadingCard();
+        }
+        if (notifSnap.hasError) {
+          return const _EmptyCard(message: 'Unable to load revision alerts right now.');
+        }
+
+        final docs = (notifSnap.data?.docs ?? const []).where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['type'] == 'proof_rejected' && data['read'] == false;
+        }).toList();
+
+        docs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTs = aData['createdAt'];
+          final bTs = bData['createdAt'];
+          final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+          final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+          return bMs.compareTo(aMs);
+        });
+
+        if (docs.isEmpty) {
+          return const _EmptyCard(message: 'No resubmission alerts.');
+        }
+
+        return _CardShell(
+          child: Column(
+            children: [
+              for (var i = 0; i < docs.length; i++) ...[
+                _ProofRejectedTile(doc: docs[i]),
+                if (i != docs.length - 1) const Divider(height: 1),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProofRejectedTile extends StatelessWidget {
+  final QueryDocumentSnapshot doc;
+
+  const _ProofRejectedTile({required this.doc});
+
+  Future<void> _open(BuildContext context) async {
+    final data = doc.data() as Map<String, dynamic>;
+    final taskId = (data['taskId'] as String?) ?? '';
+    final matchRecordId = (data['matchRecordId'] as String?) ?? '';
+    if (taskId.isEmpty || matchRecordId.isEmpty) {
+      return;
+    }
+
+    final taskSnap = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+    if (!taskSnap.exists) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: T('Task details are unavailable right now.')),
+        );
+      }
+      return;
+    }
+
+    final matchSnap = await FirebaseFirestore.instance.collection('match_records').doc(matchRecordId).get();
+    final matchMap = matchSnap.data() as Map<String, dynamic>?;
+
+    final taskMap = taskSnap.data() as Map<String, dynamic>;
+    taskMap['id'] = taskSnap.id;
+    final task = TaskModel.fromJson(taskMap);
+
+    try {
+      await doc.reference.update({'read': true});
+    } catch (_) {}
+
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActiveTaskScreen(
+          matchRecordId: matchRecordId,
+          task: task,
+          ngoName: null,
+          ngoPhone: null,
+          ngoEmail: null,
+          status: (matchMap?['status'] as String?) ?? 'proof_rejected',
+          proof: matchMap?['proof'] as Map<String, dynamic>?,
+          adminReviewNote: (matchMap?['adminReviewNote'] as String?) ?? (data['adminReviewNote'] as String?),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data() as Map<String, dynamic>;
+    final note = ((data['adminReviewNote'] as String?) ?? '').trim();
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: SahayaColors.coral.withValues(alpha: 0.12),
+        child: const Icon(Icons.warning_amber_rounded, color: SahayaColors.coral),
+      ),
+      title: T(
+        'Proof needs resubmission',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+      ),
+      subtitle: T(
+        note.isEmpty ? 'NGO requested updated proof.' : note,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(fontSize: 12),
+      ),
+      trailing: T(
+        'Action',
+        style: GoogleFonts.inter(color: SahayaColors.coral, fontWeight: FontWeight.w700),
+      ),
+      onTap: () => _open(context),
     );
   }
 }

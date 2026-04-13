@@ -33,7 +33,6 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
       final snapshot = await FirebaseFirestore.instance
           .collection('problem_cards')
           .where('ngoId', isEqualTo: widget.ngoId)
-          .where('status', isNotEqualTo: 'resolved')
           .get();
 
       List<CircleMarker> circles = [];
@@ -41,6 +40,7 @@ class _NgoHeatmapScreenState extends State<NgoHeatmapScreen> {
       
       for (var doc in snapshot.docs) {
         final data = doc.data();
+        if (data['status'] == 'resolved') continue;
         if (data['locationGeoPoint'] != null) {
           GeoPoint gp = data['locationGeoPoint'];
           

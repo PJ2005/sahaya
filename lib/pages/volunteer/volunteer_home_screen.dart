@@ -251,19 +251,36 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
             stream: FirebaseFirestore.instance
                 .collection('match_records')
                 .where('volunteerId', isEqualTo: widget.uid)
-                .where('status', isEqualTo: 'proof_submitted')
                 .snapshots(),
             builder: (context, proofSnap) {
-              final pending = proofSnap.data?.docs.length ?? 0;
-              return IconButton(
-                icon: _buildBadgeIcon(icon: const Icon(Icons.notifications_rounded), count: pending),
-                tooltip: 'Review Pending',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VolunteerNotificationsScreen(uid: widget.uid),
-                    ),
+              final pending = (proofSnap.data?.docs ?? const []).where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return data['status'] == 'proof_submitted';
+              }).length;
+
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('volunteer_notifications')
+                    .where('volunteerId', isEqualTo: widget.uid)
+                    .snapshots(),
+                builder: (context, notifSnap) {
+                  final rejectedAlerts = (notifSnap.data?.docs ?? const []).where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['type'] == 'proof_rejected' && data['read'] == false;
+                  }).length;
+                  final total = pending + rejectedAlerts;
+
+                  return IconButton(
+                    icon: _buildBadgeIcon(icon: const Icon(Icons.notifications_rounded), count: total),
+                    tooltip: 'Review Pending',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => VolunteerNotificationsScreen(uid: widget.uid),
+                        ),
+                      );
+                    },
                   );
                 },
               );
@@ -612,6 +629,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
                   matchScore: (matchMap?['matchScore'] as num?)?.toInt() ?? 0,
                   isAccepted: true,
                   whyMatched: (matchMap?['whyMatched'] as String?) ?? '',
+                  status: (matchMap?['status'] as String?) ?? 'accepted',
+                  proof: matchMap?['proof'] as Map<String, dynamic>?,
+                  adminReviewNote: matchMap?['adminReviewNote'] as String?,
                 );
               },
             );
@@ -656,6 +676,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
               isAccepted: isAccepted,
               isHistory: isHistory,
               whyMatched: d['whyMatched'] ?? '',
+              status: (d['status'] as String?) ?? (isHistory ? 'proof_approved' : 'accepted'),
+              proof: d['proof'] as Map<String, dynamic>?,
+              adminReviewNote: d['adminReviewNote'] as String?,
             );
           },
         );
@@ -764,6 +787,9 @@ class MissionCard extends StatelessWidget {
   final bool isAccepted;
   final bool isHistory;
   final String whyMatched;
+  final String status;
+  final Map<String, dynamic>? proof;
+  final String? adminReviewNote;
 
   const MissionCard({
     super.key,
@@ -773,6 +799,9 @@ class MissionCard extends StatelessWidget {
     required this.isAccepted,
     this.isHistory = false,
     this.whyMatched = '',
+    this.status = 'accepted',
+    this.proof,
+    this.adminReviewNote,
   });
 
   @override
@@ -791,6 +820,9 @@ class MissionCard extends StatelessWidget {
               ngoName: null, 
               ngoPhone: null,
               ngoEmail: null,
+              status: status,
+              proof: proof,
+              adminReviewNote: adminReviewNote,
             ),
           ));
         } else {
@@ -846,6 +878,15 @@ class MissionCard extends StatelessWidget {
 
   Widget _buildBadge(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    if (status == 'proof_rejected') {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          T('REVIEW', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: SahayaColors.coral, letterSpacing: 0.3)),
+          T('FIX', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: SahayaColors.coral, letterSpacing: 0.3)),
+        ],
+      );
+    }
     if (isHistory) return T('Done', style: GoogleFonts.inter(color: SahayaColors.emerald, fontWeight: FontWeight.bold));
     return Column(children: [
       T('$matchScore%', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: cs.primary)),

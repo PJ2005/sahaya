@@ -70,7 +70,6 @@ class ProofReviewScreen extends StatelessWidget {
                 stream: FirebaseFirestore.instance
                     .collection('match_records')
                     .where('taskId', whereIn: taskIds.take(30).toList())
-                    .where('status', isEqualTo: 'proof_submitted')
                     .snapshots(),
                 builder: (context, matchSnapshot) {
                   if (matchSnapshot.hasError) {
@@ -80,7 +79,10 @@ class ProofReviewScreen extends StatelessWidget {
                     return const ListShimmer(itemCount: 6);
                   }
 
-                  final pendingDocs = matchSnapshot.data!.docs;
+                  final pendingDocs = matchSnapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['status'] == 'proof_submitted';
+                  }).toList();
                   if (pendingDocs.isEmpty) {
                     return _emptyState(context);
                   }

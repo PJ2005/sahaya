@@ -143,14 +143,22 @@ class NgoHomeScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: ngoId)
-            .where('status', isEqualTo: 'approved')
-            .orderBy('priorityScore', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const ListShimmer(itemCount: 6);
           }
-          final docs = snapshot.data?.docs ?? [];
+          final docs = (snapshot.data?.docs ?? const []).where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['status'] == 'approved';
+          }).toList()
+            ..sort((a, b) {
+              final aData = a.data() as Map<String, dynamic>;
+              final bData = b.data() as Map<String, dynamic>;
+              final aPriority = (aData['priorityScore'] as num?)?.toDouble() ?? 0;
+              final bPriority = (bData['priorityScore'] as num?)?.toDouble() ?? 0;
+              return bPriority.compareTo(aPriority);
+            });
 
           return CustomScrollView(
             slivers: [

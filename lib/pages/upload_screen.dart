@@ -452,12 +452,22 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _db.collection('raw_uploads').where('ngoId', isEqualTo: widget.ngoId).orderBy('uploadedAt', descending: true).limit(10).snapshots(),
+      stream: _db.collection('raw_uploads').where('ngoId', isEqualTo: widget.ngoId).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const ListShimmer(itemCount: 4);
-        final docs = snapshot.data?.docs ?? [];
+        final docs = (snapshot.data?.docs ?? const []).toList()
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTs = aData['uploadedAt'];
+            final bTs = bData['uploadedAt'];
+            final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+            final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+            return bMs.compareTo(aMs);
+          });
+        final limitedDocs = docs.take(10).toList();
 
-        if (docs.isEmpty) {
+        if (limitedDocs.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -472,10 +482,10 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          itemCount: docs.length,
+          itemCount: limitedDocs.length,
           itemBuilder: (context, index) {
-            final data = docs[index].data() as Map<String, dynamic>;
-            final raw = RawUpload.fromJson({...data, 'id': docs[index].id});
+            final data = limitedDocs[index].data() as Map<String, dynamic>;
+            final raw = RawUpload.fromJson({...data, 'id': limitedDocs[index].id});
 
             Color statusColor = SahayaColors.amber;
             if (raw.status == UploadStatus.done) statusColor = SahayaColors.emerald;

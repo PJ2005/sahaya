@@ -587,7 +587,6 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('raw_uploads')
-          .where('ngoId', isEqualTo: widget.ngoId)
           .where('problemCardId', isEqualTo: cardId)
           .limit(1)
           .get();

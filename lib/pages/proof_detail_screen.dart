@@ -173,13 +173,22 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       final qs = await FirebaseFirestore.instance
           .collection('ngo_notifications')
           .where('ngoId', isEqualTo: uid)
-          .where('matchRecordId', isEqualTo: widget.matchRecordId)
-          .orderBy('createdAt', descending: true)
-          .limit(1)
           .get();
 
-      if (qs.docs.isNotEmpty && mounted) {
-        final msg = qs.docs.first.data()['message'] as String?;
+      final filtered = qs.docs.where((doc) {
+        final data = doc.data();
+        return data['matchRecordId'] == widget.matchRecordId;
+      }).toList()
+        ..sort((a, b) {
+          final aTs = a.data()['createdAt'];
+          final bTs = b.data()['createdAt'];
+          final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+          final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+          return bMs.compareTo(aMs);
+        });
+
+      if (filtered.isNotEmpty && mounted) {
+        final msg = filtered.first.data()['message'] as String?;
         final extracted = _extractAiInsight(msg);
         if (extracted != null) {
           setState(() {
@@ -362,10 +371,15 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
       final qs = await FirebaseFirestore.instance
           .collection('ngo_notifications')
           .where('ngoId', isEqualTo: uid)
-          .where('matchRecordId', isEqualTo: widget.matchRecordId)
-          .where('read', isEqualTo: false)
           .get();
+
       for (final doc in qs.docs) {
+        final data = doc.data();
+        final isMatch = data['matchRecordId'] == widget.matchRecordId;
+        final isUnread = data['read'] == false;
+        if (!isMatch || !isUnread) {
+          continue;
+        }
         await doc.reference.update({
           'read': true,
           'handledAt': FieldValue.serverTimestamp(),

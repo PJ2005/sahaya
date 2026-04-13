@@ -239,8 +239,6 @@ class _NgoProofPendingSection extends StatelessWidget {
       stream: FirebaseFirestore.instance
           .collection('ngo_notifications')
           .where('ngoId', isEqualTo: ngoId)
-          .where('type', isEqualTo: 'proof_submitted')
-          .where('read', isEqualTo: false)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -250,7 +248,10 @@ class _NgoProofPendingSection extends StatelessWidget {
           return const _EmptyCard(message: 'Unable to load proof notifications right now.');
         }
 
-        final docs = snapshot.data?.docs ?? const [];
+        final docs = (snapshot.data?.docs ?? const []).where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['type'] == 'proof_submitted' && data['read'] == false;
+        }).toList();
         if (docs.isEmpty) {
           return const _EmptyCard(message: 'No proof reviews pending.');
         }

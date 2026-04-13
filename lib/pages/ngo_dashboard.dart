@@ -32,6 +32,15 @@ class _NgoDashboardState extends State<NgoDashboard> {
   final Set<String> _shownNotificationIds = <String>{};
   int _lastPendingProofCount = 0;
 
+  bool _isUnreadProofNotification(Map<String, dynamic> data) {
+    return data['type'] == 'proof_submitted' && data['read'] == false;
+  }
+
+  bool _isReviewQueueCard(Map<String, dynamic> data) {
+    final status = data['status'];
+    return status == 'pending_review' || status == 'extraction_failed';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -55,13 +64,14 @@ class _NgoDashboardState extends State<NgoDashboard> {
     _proofNotificationSubscription = FirebaseFirestore.instance
         .collection('ngo_notifications')
         .where('ngoId', isEqualTo: widget.ngoId)
-        .where('type', isEqualTo: 'proof_submitted')
-        .where('read', isEqualTo: false)
         .snapshots()
         .listen((snapshot) {
           if (!mounted) return;
 
-          final docs = snapshot.docs;
+          final docs = snapshot.docs.where((doc) {
+            final data = doc.data();
+            return _isUnreadProofNotification(data);
+          }).toList();
           final count = docs.length;
 
           // Count genuinely new IDs we haven't shown before
@@ -265,11 +275,12 @@ class _NgoDashboardState extends State<NgoDashboard> {
             stream: FirebaseFirestore.instance
                 .collection('ngo_notifications')
                 .where('ngoId', isEqualTo: widget.ngoId)
-                .where('type', isEqualTo: 'proof_submitted')
-                .where('read', isEqualTo: false)
                 .snapshots(),
             builder: (context, pendingSnap) {
-              final pending = pendingSnap.data?.docs.length ?? 0;
+              final pending = (pendingSnap.data?.docs ?? const []).where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return _isUnreadProofNotification(data);
+              }).length;
               return IconButton(
                 icon: _buildBadgeIcon(icon: const Icon(Icons.notifications_rounded), count: pending),
                 tooltip: 'Notifications',
@@ -332,10 +343,12 @@ class _NgoDashboardState extends State<NgoDashboard> {
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: widget.ngoId)
-            .where('status', whereIn: ['pending_review', 'extraction_failed'])
             .snapshots(),
         builder: (context, snapshot) {
-          final pendingCount = snapshot.data?.docs.length ?? 0;
+          final pendingCount = (snapshot.data?.docs ?? const []).where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return _isReviewQueueCard(data);
+          }).length;
 
           return NavigationBar(
             selectedIndex: _currentIndex,

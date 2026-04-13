@@ -25,16 +25,17 @@ class ReviewQueueScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('problem_cards')
             .where('ngoId', isEqualTo: ngoId)
-            .where('status', whereIn: [
-              ProblemStatus.pending_review.name,
-              ProblemStatus.extraction_failed.name,
-            ])
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const ListShimmer(itemCount: 6);
           }
-          final docs = snapshot.data?.docs ?? [];
+          final docs = (snapshot.data?.docs ?? const []).where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final status = data['status'];
+            return status == ProblemStatus.pending_review.name ||
+                status == ProblemStatus.extraction_failed.name;
+          }).toList();
           
           if (docs.isEmpty) {
             return _emptyState(context);
@@ -272,7 +273,6 @@ class _ReviewBlock extends StatelessWidget {
 
       final linkedSnap = await db
           .collection('raw_uploads')
-          .where('ngoId', isEqualTo: ngoId)
           .where('problemCardId', isEqualTo: card.id)
           .limit(1)
           .get(const GetOptions(source: Source.serverAndCache));

@@ -241,8 +241,8 @@ def _check_recent_text_duplicate(ngo_id, upload_fingerprint, hours=48):
     try:
         threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
         candidates = db.collection('raw_uploads') \
-            .where('ngoId', '==', ngo_id) \
-            .where('uploadFingerprint', '==', upload_fingerprint) \
+            .where(field_path='ngoId', op_string='==', value=ngo_id) \
+            .where(field_path='uploadFingerprint', op_string='==', value=upload_fingerprint) \
             .stream()
         for doc in candidates:
             d = doc.to_dict() or {}
@@ -263,8 +263,8 @@ def _check_problem_duplicate(problem_card_id, ngo_id, issue_type, ward, city, de
     fp = _fingerprint(issue_type, ward, city, description)
     try:
         candidates = db.collection('problem_cards') \
-            .where('ngoId', '==', ngo_id) \
-            .where('dupFingerprint', '==', fp) \
+            .where(field_path='ngoId', op_string='==', value=ngo_id) \
+            .where(field_path='dupFingerprint', op_string='==', value=fp) \
             .limit(5) \
             .stream()
         for doc in candidates:
