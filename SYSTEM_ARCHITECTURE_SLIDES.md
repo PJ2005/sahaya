@@ -413,8 +413,3 @@ flowchart TB
     C2 --> R5
     C2 -.-> R6
 ```
-
-## Presenter Notes (Optional)
-- Keep the narrative loop simple: intake -> intelligence -> dispatch -> verification -> measurable impact.
-- Highlight deterministic safeguards around AI outputs (schema sanitization, constrained taxonomies, bounded scoring).
-- Emphasize the rejection-resubmission loop and offline sync conflict policy as real-world reliability features.
