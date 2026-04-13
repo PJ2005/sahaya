@@ -54,6 +54,15 @@ Design and operate a production-ready system that:
   - tamperRiskScore
 - Auto-approval now uses rubric-weighted confidence and tamper safeguards.
 
+### Rejection and Resubmission UX
+- Volunteer Active Mission flow now preserves NGO rejection context with inline admin feedback notes.
+- Rejected proof records now surface as explicit "resubmission required" alerts in volunteer notifications.
+- Volunteer notification badges now include unread proof-rejected alerts to prevent missed follow-up.
+
+### Firestore Query Reliability
+- Reduced composite-index dependency across high-traffic NGO and volunteer screens by shifting safe filters/sorts to client-side post owner-scoped queries.
+- Preserved user-visible behavior while lowering index churn risk during rapid iteration.
+
 ### Matching and Dispatch Improvements
 - Adaptive match weighting based on historical outcome signals.
 - Explainable match factors persisted for auditability.
@@ -79,6 +88,7 @@ Design and operate a production-ready system that:
 - Personalized matching with explainable dispatch logic.
 - Task lifecycle actions with offline-sync conflict handling.
 - Proof submission and status feedback loop.
+- Rejection-aware proof resubmission workflow with actionable admin comments.
 - Real-time team chat and role-aware notifications.
 
 ## Architecture Snapshot
