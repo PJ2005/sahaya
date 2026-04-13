@@ -40,6 +40,50 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
   String? _error;
   List<Map<String, dynamic>>? _preview;
 
+  static const Set<String> _allowedTaskTypes = {
+    'data_collection',
+    'community_outreach',
+    'logistics_coordination',
+    'technical_repair',
+    'awareness_session',
+    'other',
+  };
+
+  static const Set<String> _allowedSkills = {
+    'communication',
+    'data_entry',
+    'transport',
+    'technical',
+    'medical',
+    'education',
+    'physical_labor',
+    'community_outreach',
+  };
+
+  Map<String, dynamic> _sanitizeTaskForWrite(Map<String, dynamic> task) {
+    final type = '${task['taskType'] ?? 'other'}'.trim().toLowerCase();
+    final safeType = _allowedTaskTypes.contains(type) ? type : 'other';
+    final rawSkills = task['skillTags'] is List ? task['skillTags'] as List : const [];
+    final safeSkills = rawSkills
+        .map((s) => '$s'.trim().toLowerCase())
+        .where(_allowedSkills.contains)
+        .toList();
+
+    final estimatedVolunteers =
+        (task['estimatedVolunteers'] is num) ? (task['estimatedVolunteers'] as num).toInt() : int.tryParse('${task['estimatedVolunteers']}') ?? 1;
+    final estimatedDuration =
+        (task['estimatedDurationHours'] is num) ? (task['estimatedDurationHours'] as num).toDouble() : double.tryParse('${task['estimatedDurationHours']}') ?? 2.0;
+
+    return {
+      'id': '${task['id'] ?? 'NEW'}',
+      'taskType': safeType,
+      'description': '${task['description'] ?? 'Volunteer task'}'.trim().substring(0, ('${task['description'] ?? 'Volunteer task'}'.trim().length > 140) ? 140 : '${task['description'] ?? 'Volunteer task'}'.trim().length),
+      'skillTags': safeSkills.isEmpty ? ['communication'] : safeSkills,
+      'estimatedVolunteers': estimatedVolunteers.clamp(1, 10),
+      'estimatedDurationHours': estimatedDuration.clamp(0.5, 24.0),
+    };
+  }
+
   List<Map<String, dynamic>> get _currentTasks => widget.taskDocs
       .map((d) => Map<String, dynamic>.from(d.data() as Map))
       .toList();
@@ -85,20 +129,21 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
       final keptIds = <String>{};
 
       for (final task in _preview!) {
-        final id = task['id']?.toString() ?? 'NEW';
+        final safeTask = _sanitizeTaskForWrite(task);
+        final id = safeTask['id']?.toString() ?? 'NEW';
         if (id == 'NEW' || !existingIds.containsKey(id)) {
           // Create new task
           final newRef = FirebaseFirestore.instance.collection('tasks').doc();
-          task['id'] = newRef.id;
-          task['problemCardId'] = widget.problemCardId;
-          batch.set(newRef, task);
+          safeTask['id'] = newRef.id;
+          safeTask['problemCardId'] = widget.problemCardId;
+          batch.set(newRef, safeTask);
         } else {
           // Update existing task
           keptIds.add(id);
-          task['problemCardId'] = widget.problemCardId;
+          safeTask['problemCardId'] = widget.problemCardId;
           batch.update(
             FirebaseFirestore.instance.collection('tasks').doc(id),
-            task,
+            safeTask,
           );
         }
       }

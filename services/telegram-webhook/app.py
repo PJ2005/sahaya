@@ -74,10 +74,55 @@ else:
 app = Flask(__name__)
 
 ALLOWED_ISSUE_TYPES = {
-    'water_access', 'sanitation', 'education', 'nutrition',
-    'healthcare', 'livelihood', 'other'
+    'sdg1_no_poverty',
+    'sdg2_zero_hunger',
+    'sdg3_good_health_and_well_being',
+    'sdg4_quality_education',
+    'sdg5_gender_equality',
+    'sdg6_clean_water_and_sanitation',
+    'sdg7_affordable_and_clean_energy',
+    'sdg8_decent_work_and_economic_growth',
+    'sdg9_industry_innovation_and_infrastructure',
+    'sdg10_reduced_inequalities',
+    'sdg11_sustainable_cities_and_communities',
+    'sdg12_responsible_consumption_and_production',
+    'sdg13_climate_action',
+    'sdg14_life_below_water',
+    'sdg15_life_on_land',
+    'sdg16_peace_justice_and_strong_institutions',
+    'sdg17_partnerships_for_the_goals',
 }
 ALLOWED_SEVERITY = {'low', 'medium', 'high', 'critical'}
+
+LEGACY_ISSUE_TYPE_MAP = {
+    'water_access': 'sdg6_clean_water_and_sanitation',
+    'sanitation': 'sdg6_clean_water_and_sanitation',
+    'education': 'sdg4_quality_education',
+    'nutrition': 'sdg2_zero_hunger',
+    'healthcare': 'sdg3_good_health_and_well_being',
+    'livelihood': 'sdg8_decent_work_and_economic_growth',
+    'other': 'sdg11_sustainable_cities_and_communities',
+}
+
+ALLOWED_TASK_TYPES = {
+    'data_collection',
+    'community_outreach',
+    'logistics_coordination',
+    'technical_repair',
+    'awareness_session',
+    'other',
+}
+
+ALLOWED_TASK_SKILLS = {
+    'communication',
+    'data_entry',
+    'transport',
+    'technical',
+    'medical',
+    'education',
+    'physical_labor',
+    'community_outreach',
+}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -147,6 +192,25 @@ def _norm_text(value):
     return re.sub(r'\s+', ' ', str(value).strip().lower())
 
 
+def _normalize_issue_type(value):
+    key = _norm_text(value)
+    if key in ALLOWED_ISSUE_TYPES:
+        return key
+    if key in LEGACY_ISSUE_TYPE_MAP:
+        return LEGACY_ISSUE_TYPE_MAP[key]
+    return 'sdg11_sustainable_cities_and_communities'
+
+
+def _near_duplicate_score(a, b):
+    tokens_a = set(re.findall(r'[a-z0-9]+', _norm_text(a)))
+    tokens_b = set(re.findall(r'[a-z0-9]+', _norm_text(b)))
+    if not tokens_a and not tokens_b:
+        return 0.0
+    inter = len(tokens_a.intersection(tokens_b))
+    union = max(1, len(tokens_a.union(tokens_b)))
+    return inter / union
+
+
 def _fingerprint(*parts):
     joined = '||'.join(_norm_text(p) for p in parts)
     return hashlib.sha256(joined.encode('utf-8')).hexdigest()[:24]
@@ -210,6 +274,153 @@ def _check_problem_duplicate(problem_card_id, ngo_id, issue_type, ward, city, de
     except Exception as e:
         print(f"problem duplicate check failed: {e}")
         return False, fp
+
+
+def _check_problem_near_duplicates(problem_card_id, ngo_id, issue_type, ward, city, description, limit=30):
+    if not db:
+        return []
+    results = []
+    try:
+        stream = db.collection('problem_cards').where('ngoId', '==', ngo_id).order_by('createdAt', direction=firestore.Query.DESCENDING).limit(limit).stream()
+        for doc in stream:
+            if doc.id == problem_card_id:
+                continue
+            d = doc.to_dict() or {}
+            score = 0.0
+            if _normalize_issue_type(d.get('issueType')) == _normalize_issue_type(issue_type):
+                score += 0.25
+            if _norm_text(d.get('locationWard')) == _norm_text(ward):
+                score += 0.20
+            if _norm_text(d.get('locationCity')) == _norm_text(city):
+                score += 0.20
+            score += 0.35 * _near_duplicate_score(d.get('description', ''), description)
+            if score >= 0.65:
+                results.append({'problemCardId': doc.id, 'score': round(score, 3)})
+        results.sort(key=lambda x: x['score'], reverse=True)
+        return results[:5]
+    except Exception as e:
+        print(f"near duplicate check failed: {e}")
+        return []
+
+
+def _coerce_value_to_shape(value, template):
+    if template is None:
+        return value
+    if isinstance(template, bool):
+        if isinstance(value, bool):
+            return value
+        t = _norm_text(value)
+        return t in ('true', '1', 'yes', 'y')
+    if isinstance(template, int) and not isinstance(template, bool):
+        return _safe_int(value, default=template, min_value=-1000000, max_value=1000000)
+    if isinstance(template, float):
+        return _safe_float(value, default=template, min_value=-1000000.0, max_value=1000000.0)
+    if isinstance(template, str):
+        return str(value) if value is not None else ''
+    if isinstance(template, list):
+        if isinstance(value, list):
+            return value
+        return template
+    if isinstance(template, dict):
+        if isinstance(value, dict):
+            return value
+        return template
+    return value
+
+
+def _sanitize_ai_edit_object(candidate, current_data):
+    if not isinstance(candidate, dict):
+        return dict(current_data)
+
+    immutable_keys = {
+        'id', 'ngoId', 'problemCardId', 'createdAt', 'updatedAt', 'anonymized',
+        'assignedVolunteerIds', 'uploadFingerprint', 'dupFingerprint',
+    }
+    out = dict(current_data)
+    for key, original in current_data.items():
+        if key in immutable_keys:
+            continue
+        if key in candidate:
+            out[key] = _coerce_value_to_shape(candidate[key], original)
+
+    if 'issueType' in out:
+        out['issueType'] = _normalize_issue_type(out.get('issueType'))
+    if 'severityLevel' in out:
+        sev = _norm_text(out.get('severityLevel'))
+        out['severityLevel'] = sev if sev in ALLOWED_SEVERITY else 'low'
+    return out
+
+
+def _sanitize_ai_task_item(candidate):
+    if not isinstance(candidate, dict):
+        return None
+    item = dict(candidate)
+    task_type = _norm_text(item.get('taskType', 'other'))
+    if task_type not in ALLOWED_TASK_TYPES:
+        task_type = 'other'
+
+    raw_skills = item.get('skillTags') if isinstance(item.get('skillTags'), list) else []
+    skill_tags = [
+        _norm_text(s) for s in raw_skills
+        if _norm_text(s) in ALLOWED_TASK_SKILLS
+    ]
+    if not skill_tags:
+        skill_tags = ['communication']
+
+    return {
+        'id': str(item.get('id', 'NEW')),
+        'taskType': task_type,
+        'description': str(item.get('description', 'Volunteer task'))[:140],
+        'skillTags': skill_tags,
+        'estimatedVolunteers': _safe_int(item.get('estimatedVolunteers', 1), default=1, min_value=1, max_value=10),
+        'estimatedDurationHours': _safe_float(item.get('estimatedDurationHours', 2), default=2.0, min_value=0.5, max_value=24.0),
+    }
+
+
+def _compute_adaptive_match_weights():
+    defaults = {
+        'skill': 0.50,
+        'distance': 0.28,
+        'availability': 0.06,
+        'language': 0.11,
+        'trust': 0.05,
+    }
+    if not db:
+        return defaults
+
+    try:
+        succ = {'skill': [], 'distance': [], 'availability': [], 'language': [], 'trust': []}
+        fail = {'skill': [], 'distance': [], 'availability': [], 'language': [], 'trust': []}
+
+        stream = db.collection('match_records').order_by('createdAt', direction=firestore.Query.DESCENDING).limit(250).stream()
+        for doc in stream:
+            d = doc.to_dict() or {}
+            factors = d.get('explainFactors') or {}
+            if not factors:
+                continue
+            status = _norm_text(d.get('status'))
+            bucket = succ if status in ('proof_approved', 'proof_submitted', 'accepted') else fail
+            bucket['skill'].append(_safe_float(factors.get('skillScore', 0.0), default=0.0, min_value=0.0, max_value=1.0))
+            bucket['distance'].append(_safe_float(factors.get('distanceScore', 0.0), default=0.0, min_value=0.0, max_value=1.0))
+            bucket['availability'].append(_safe_float(factors.get('availabilityBonus', 0.0), default=0.0, min_value=0.0, max_value=1.0))
+            bucket['language'].append(_safe_float(factors.get('languageScore', 0.0), default=0.0, min_value=0.0, max_value=1.0))
+            bucket['trust'].append(_safe_float(factors.get('trustScoreNorm', 0.0), default=0.0, min_value=0.0, max_value=1.0))
+
+        if sum(len(v) for v in succ.values()) < 20:
+            return defaults
+
+        tuned = {}
+        for k, base in defaults.items():
+            s_mean = (sum(succ[k]) / len(succ[k])) if succ[k] else 0.0
+            f_mean = (sum(fail[k]) / len(fail[k])) if fail[k] else 0.0
+            lift = max(-0.25, min(0.25, s_mean - f_mean))
+            tuned[k] = max(0.02, base * (1.0 + lift))
+
+        total = sum(tuned.values())
+        return {k: round(v / total, 4) for k, v in tuned.items()}
+    except Exception as e:
+        print(f"adaptive weight computation failed: {e}")
+        return defaults
 
 
 def _to_utc(value):
@@ -368,6 +579,7 @@ def _run_matching_internal(task_id, exclude_volunteer_ids=None, redispatch_reaso
     pc_lat, pc_lon = (pc_geo.latitude, pc_geo.longitude) if pc_geo else (13.0827, 80.2707)
 
     volunteers_query = db.collection('volunteer_profiles').where('availabilityWindowActive', '==', True).stream()
+    weights = _compute_adaptive_match_weights()
     matches = []
     filtered_language = 0
     filtered_trust = 0
@@ -412,11 +624,11 @@ def _run_matching_internal(task_id, exclude_volunteer_ids=None, redispatch_reaso
         trust_score_norm = min(trust_score / 100.0, 1.0)
 
         score = (
-            skill_score * 0.50 +
-            distance_score * 0.28 +
-            availability_bonus * 0.60 +
-            language_match * 0.12 +
-            trust_score_norm * 0.05
+            skill_score * weights['skill'] +
+            distance_score * weights['distance'] +
+            availability_bonus * weights['availability'] +
+            language_match * weights['language'] +
+            trust_score_norm * weights['trust']
         )
 
         why_parts = []
@@ -444,6 +656,7 @@ def _run_matching_internal(task_id, exclude_volunteer_ids=None, redispatch_reaso
                 'availabilityBonus': round(availability_bonus, 4),
                 'languageScore': round(language_match, 4),
                 'trustScoreNorm': round(trust_score_norm, 4),
+                'weightsUsed': weights,
             },
             'whyMatched': ' | '.join(why_parts),
         })
@@ -767,12 +980,12 @@ def generate_tasks():
             print(f"Existing task check failed: {e}")
 
     description = str(pc.get('description', 'No description'))[:600]
-    issue_type = str(pc.get('issueType', 'other')).strip().lower()
+    raw_issue_type = str(pc.get('issueType', '')).strip().lower()
+    issue_type = _normalize_issue_type(raw_issue_type)
     severity_level = str(pc.get('severityLevel', 'low')).strip().lower()
     affected_count = _safe_int(pc.get('affectedCount', 0), default=0, min_value=0, max_value=100000)
 
-    if issue_type not in ALLOWED_ISSUE_TYPES:
-        issue_type = 'other'
+    if raw_issue_type != issue_type:
         quality_flags.append('issue_type_normalized')
     if severity_level not in ALLOWED_SEVERITY:
         severity_level = 'low'
@@ -787,6 +1000,16 @@ def generate_tasks():
         description,
     )
     quality_flags.append('possible_duplicate_problem_card' if is_duplicate_card else 'no_duplicate_problem_card')
+    near_duplicates = _check_problem_near_duplicates(
+        problem_card_id,
+        ngo_id,
+        issue_type,
+        pc.get('locationWard', ''),
+        pc.get('locationCity', ''),
+        description,
+    )
+    if near_duplicates:
+        quality_flags.append('near_duplicate_problem_card')
 
     task_prompt = (
         f"Community problem: {description}, issue type: {issue_type}, "
@@ -820,15 +1043,18 @@ def generate_tasks():
 
     created_task_ids = []
     for task_data in tasks_json:
+        safe_task = _sanitize_ai_task_item(task_data)
+        if not safe_task:
+            continue
         task_id = str(uuid.uuid4())
-        estimated_volunteers = _safe_int(task_data.get('estimatedVolunteers', 1), default=1, min_value=1, max_value=10)
-        estimated_hours = _safe_float(task_data.get('estimatedDurationHours', 1), default=1.0, min_value=0.5, max_value=24.0)
+        estimated_volunteers = _safe_int(safe_task.get('estimatedVolunteers', 1), default=1, min_value=1, max_value=10)
+        estimated_hours = _safe_float(safe_task.get('estimatedDurationHours', 1), default=1.0, min_value=0.5, max_value=24.0)
         task_doc = {
             'id': task_id,
             'problemCardId': problem_card_id,
-            'taskType': str(task_data.get('taskType', 'other')),
-            'description': str(task_data.get('description', 'Volunteer task'))[:140],
-            'skillTags': task_data.get('skillTags', []),
+            'taskType': str(safe_task.get('taskType', 'other')),
+            'description': str(safe_task.get('description', 'Volunteer task'))[:140],
+            'skillTags': safe_task.get('skillTags', []),
             'estimatedVolunteers': estimated_volunteers,
             'estimatedDurationHours': estimated_hours,
             'status': 'open',
@@ -874,6 +1100,7 @@ def generate_tasks():
             'gapContrib':      round(gap_contrib, 2),
             'dupFingerprint': dup_fp,
             'qualityFlags': quality_flags,
+            'nearDuplicates': near_duplicates,
         })
     except Exception as e:
         print(f"Priority score update failed: {e}")
@@ -1194,14 +1421,32 @@ def notify_proof_submitted():
         is_auto_approved = False
         ai_reason = "No photos for AI analysis"
         confidence = 0
+        rubric = {
+            'taskEvidenceScore': 0,
+            'clarityScore': 0,
+            'geoTemporalPlausibilityScore': 0,
+            'tamperRiskScore': 0,
+            'summary': 'No photos for AI analysis',
+        }
 
         if proof_photos and genai_client:
             prompt = f'''
 You are an NGO admin verifying volunteer proof.
 Task description: "{task_desc}"
-Review the attached proof photos. Does the imagery show clear evidence of this specific work being completed?
+Score proof using this rubric (0-100 each):
+- taskEvidenceScore: does image clearly show task outcome?
+- clarityScore: image quality and visibility
+- geoTemporalPlausibilityScore: context plausibly matches location/time
+- tamperRiskScore: higher means more likely manipulated or irrelevant
+
 Return ONLY valid JSON:
-{{"confidence": 0-100, "reason": "short explanation of evidence"}}
+{{
+    "taskEvidenceScore": 0-100,
+    "clarityScore": 0-100,
+    "geoTemporalPlausibilityScore": 0-100,
+    "tamperRiskScore": 0-100,
+    "summary": "short explanation"
+}}
 '''
             contents = [prompt]
             for url in proof_photos:
@@ -1219,9 +1464,21 @@ Return ONLY valid JSON:
                     m = re.search(r'\{.*\}', raw, re.DOTALL)
                     cleaned = m.group(0) if m else raw.replace('```json', '').replace('```', '').strip()
                     parsed = json.loads(cleaned)
-                    confidence = float(parsed.get('confidence', 0))
-                    ai_reason = parsed.get('reason', 'AI checked')
-                    if confidence >= 85:
+                    rubric['taskEvidenceScore'] = _safe_float(parsed.get('taskEvidenceScore', 0), default=0.0, min_value=0.0, max_value=100.0)
+                    rubric['clarityScore'] = _safe_float(parsed.get('clarityScore', 0), default=0.0, min_value=0.0, max_value=100.0)
+                    rubric['geoTemporalPlausibilityScore'] = _safe_float(parsed.get('geoTemporalPlausibilityScore', 0), default=0.0, min_value=0.0, max_value=100.0)
+                    rubric['tamperRiskScore'] = _safe_float(parsed.get('tamperRiskScore', 100), default=100.0, min_value=0.0, max_value=100.0)
+                    rubric['summary'] = str(parsed.get('summary', 'AI checked'))[:240]
+
+                    confidence = round(
+                        rubric['taskEvidenceScore'] * 0.45 +
+                        rubric['clarityScore'] * 0.20 +
+                        rubric['geoTemporalPlausibilityScore'] * 0.25 +
+                        (100 - rubric['tamperRiskScore']) * 0.10,
+                        2,
+                    )
+                    ai_reason = rubric['summary']
+                    if confidence >= 85 and rubric['tamperRiskScore'] <= 35:
                         is_auto_approved = True
                 except Exception as e:
                     ai_reason = f"AI Error: {e}"
@@ -1232,6 +1489,8 @@ Return ONLY valid JSON:
         db.collection('match_records').document(match_record_id).update({
             'aiVerificationReason': ai_verification_reason,
             'aiVerificationLabel': label,
+            'aiVerificationConfidence': confidence,
+            'aiVerificationRubric': rubric,
             'aiVerifiedAt': firestore.SERVER_TIMESTAMP,
         })
 
@@ -1349,14 +1608,14 @@ def complete_task():
         task_data = task_doc.to_dict()
         problem_card_id = task_data.get('problemCardId', '')
 
-        issue_type = 'other'
+        issue_type = 'sdg11_sustainable_cities_and_communities'
         affected_count = 0
         location_ward = task_data.get('locationWard', 'Unknown Ward')
         if problem_card_id:
             pc_doc = db.collection('problem_cards').document(problem_card_id).get()
             if pc_doc.exists:
                 pc_data = pc_doc.to_dict()
-                issue_type = pc_data.get('issueType', issue_type)
+                issue_type = _normalize_issue_type(pc_data.get('issueType', issue_type))
                 affected_count = int(pc_data.get('affectedCount', 0) or 0)
                 location_ward = pc_data.get('locationWard', location_ward)
 
@@ -1484,7 +1743,7 @@ def gemini_extract_problems():
         "Extract every single independent field problem into its own logical structure. "
         "Return ONLY a valid geometric JSON Array `[...]` of mapped objects. "
         "For EACH independent extracted problem, strictly return: "
-        "- issueType (one of: water_access, sanitation, education, nutrition, healthcare, livelihood, other)\n"
+        "- issueType (one of: sdg1_no_poverty, sdg2_zero_hunger, sdg3_good_health_and_well_being, sdg4_quality_education, sdg5_gender_equality, sdg6_clean_water_and_sanitation, sdg7_affordable_and_clean_energy, sdg8_decent_work_and_economic_growth, sdg9_industry_innovation_and_infrastructure, sdg10_reduced_inequalities, sdg11_sustainable_cities_and_communities, sdg12_responsible_consumption_and_production, sdg13_climate_action, sdg14_life_below_water, sdg15_life_on_land, sdg16_peace_justice_and_strong_institutions, sdg17_partnerships_for_the_goals)\n"
         "- locationWard (string)\n"
         "- locationCity (string)\n"
         "- severityLevel (one of: low, medium, high, critical)\n"
@@ -1503,7 +1762,7 @@ def gemini_extract_problems():
             if res.ok:
                 mime_type = res.headers.get('content-type', 'audio/mp4' if file_type == 'audio' else 'image/jpeg')
                 contents.append(prompt_text)
-                contents.append({'mime_type': mime_type, 'data': res.content})
+                contents.append(genai.types.Part.from_bytes(data=res.content, mime_type=mime_type))
             else:
                 return jsonify({'error': 'Failed to fetch media'}), 400
         except Exception as e:
@@ -1515,7 +1774,78 @@ def gemini_extract_problems():
         m = re.search(r'\[.*\]', raw_text, re.DOTALL)
         cleaned = m.group(0) if m else raw_text.replace('```json', '').replace('```', '').strip()
         parsed = json.loads(cleaned)
-        return jsonify(parsed), 200
+        if not isinstance(parsed, list):
+            return jsonify({'error': 'Expected JSON array from model'}), 500
+
+        normalized = []
+        for row in parsed:
+            if not isinstance(row, dict):
+                continue
+            sev = _norm_text(row.get('severityLevel', 'low'))
+            normalized.append({
+                'issueType': _normalize_issue_type(row.get('issueType')),
+                'locationWard': str(row.get('locationWard', 'Unknown Ward')),
+                'locationCity': str(row.get('locationCity', 'Unknown City')),
+                'severityLevel': sev if sev in ALLOWED_SEVERITY else 'low',
+                'affectedCount': _safe_int(row.get('affectedCount', 0), default=0, min_value=0, max_value=100000),
+                'description': str(row.get('description', 'Extracted problem'))[:120],
+                'confidenceScore': _safe_float(row.get('confidenceScore', 0.0), default=0.0, min_value=0.0, max_value=1.0),
+            })
+        return jsonify(normalized), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/gemini/extract-problems-audio', methods=['POST'])
+def gemini_extract_problems_audio():
+    if not genai_client:
+        return jsonify({'error': 'Gemini not configured'}), 500
+
+    audio_file = request.files.get('audio')
+    if not audio_file:
+        return jsonify({'error': 'Missing audio file'}), 400
+
+    mime_type = audio_file.mimetype or 'audio/m4a'
+    try:
+        audio_bytes = audio_file.read()
+    except Exception as e:
+        return jsonify({'error': f'Could not read audio: {e}'}), 400
+
+    prompt_text = (
+        "You are a massive array-extraction agent for NGO community surveys. "
+        "The input is an audio field note. Extract each independent problem. "
+        "Return ONLY valid JSON array. Each object must include: issueType (SDG value), "
+        "locationWard, locationCity, severityLevel, affectedCount, description, confidenceScore. "
+        "issueType must be one of sdg1_no_poverty ... sdg17_partnerships_for_the_goals."
+    )
+
+    try:
+        contents = [
+            prompt_text,
+            genai.types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+        ]
+        resp = genai_client.models.generate_content(model=GEMINI_MODEL, contents=contents)
+        raw_text = resp.text or '[]'
+        m = re.search(r'\[.*\]', raw_text, re.DOTALL)
+        cleaned = m.group(0) if m else raw_text.replace('```json', '').replace('```', '').strip()
+        parsed = json.loads(cleaned)
+        if not isinstance(parsed, list):
+            return jsonify({'error': 'Expected JSON array from model'}), 500
+
+        normalized = []
+        for row in parsed:
+            if not isinstance(row, dict):
+                continue
+            normalized.append({
+                'issueType': _normalize_issue_type(row.get('issueType')),
+                'locationWard': str(row.get('locationWard', 'Unknown Ward')),
+                'locationCity': str(row.get('locationCity', 'Unknown City')),
+                'severityLevel': _norm_text(row.get('severityLevel', 'low')) if _norm_text(row.get('severityLevel', 'low')) in ALLOWED_SEVERITY else 'low',
+                'affectedCount': _safe_int(row.get('affectedCount', 0), default=0, min_value=0, max_value=100000),
+                'description': str(row.get('description', 'Extracted from audio'))[:120],
+                'confidenceScore': _safe_float(row.get('confidenceScore', 0.0), default=0.0, min_value=0.0, max_value=1.0),
+            })
+        return jsonify(normalized), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1540,7 +1870,8 @@ Apply the requested changes and return ONLY the full modified JSON object. Retur
         m = re.search(r'\{.*\}', resp, re.DOTALL)
         cleaned = m.group(0) if m else (resp or '{}').replace('```json', '').replace('```', '').strip()
         parsed = json.loads(cleaned)
-        return jsonify(parsed), 200
+        safe = _sanitize_ai_edit_object(parsed, current_data)
+        return jsonify(safe), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1565,7 +1896,14 @@ Apply changes. Return ONLY a valid JSON array. For NEW items, set "id" to "NEW".
         m = re.search(r'\[.*\]', resp, re.DOTALL)
         cleaned = m.group(0) if m else (resp or '[]').replace('```json', '').replace('```', '').strip()
         parsed = json.loads(cleaned)
-        return jsonify(parsed), 200
+        if not isinstance(parsed, list):
+            return jsonify({'error': 'AI response is not a list'}), 500
+        safe_items = []
+        for row in parsed:
+            safe = _sanitize_ai_task_item(row)
+            if safe:
+                safe_items.append(safe)
+        return jsonify(safe_items), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

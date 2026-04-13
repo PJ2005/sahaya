@@ -63,9 +63,20 @@ class GeminiService {
   }
 
   static Future<List<ProblemCard>> structureFromAudio(String audioPath, String ngoId) async {
-    // We send local audio directly as base64 or upload to cloudinary first?
-    // Since audio routing locally is tough via JSON, we'll temporarily handle this backend call directly.
-    throw UnimplementedError("Migrate audio upload directly to cloudinary first in component.");
+    final req = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_backendUrl/api/gemini/extract-problems-audio'),
+    );
+    req.files.add(await http.MultipartFile.fromPath('audio', audioPath));
+
+    final streamed = await req.send();
+    final body = await streamed.stream.bytesToString();
+    if (streamed.statusCode != 200) {
+      throw Exception('Backend audio extraction failed: ${streamed.statusCode} - $body');
+    }
+
+    String baseId = 'voice_ai_${DateTime.now().millisecondsSinceEpoch}';
+    return await _parseProblemCardsJson(body, baseId, ngoId);
   }
 
   static Future<Map<String, dynamic>> aiEdit({

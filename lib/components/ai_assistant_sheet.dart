@@ -46,6 +46,59 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
   String? _error;
   Map<String, dynamic>? _preview;
 
+  dynamic _coerceToOriginalType(dynamic incoming, dynamic original) {
+    if (original is int) {
+      if (incoming is int) return incoming;
+      if (incoming is num) return incoming.toInt();
+      return int.tryParse('$incoming') ?? original;
+    }
+    if (original is double) {
+      if (incoming is double) return incoming;
+      if (incoming is num) return incoming.toDouble();
+      return double.tryParse('$incoming') ?? original;
+    }
+    if (original is bool) {
+      if (incoming is bool) return incoming;
+      final t = '$incoming'.trim().toLowerCase();
+      return t == 'true' || t == '1' || t == 'yes';
+    }
+    if (original is String) {
+      return '$incoming';
+    }
+    if (original is List) {
+      return incoming is List ? incoming : original;
+    }
+    if (original is Map) {
+      return incoming is Map ? incoming : original;
+    }
+    return incoming;
+  }
+
+  Map<String, dynamic> _safePreviewForApply() {
+    final preview = _preview ?? const <String, dynamic>{};
+    final current = widget.currentData;
+    const immutableKeys = <String>{
+      'id',
+      'ngoId',
+      'problemCardId',
+      'createdAt',
+      'updatedAt',
+      'assignedVolunteerIds',
+      'dupFingerprint',
+      'uploadFingerprint',
+    };
+
+    final out = Map<String, dynamic>.from(current);
+    for (final entry in preview.entries) {
+      final key = entry.key;
+      if (!current.containsKey(key) || immutableKeys.contains(key)) {
+        continue;
+      }
+      out[key] = _coerceToOriginalType(entry.value, current[key]);
+    }
+    return out;
+  }
+
   void _submit() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -325,7 +378,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
                           onPressed: () {
-                            widget.onResult(_preview!);
+                            widget.onResult(_safePreviewForApply());
                             Navigator.pop(context);
                           },
                           icon: const Icon(Icons.check, size: 16),

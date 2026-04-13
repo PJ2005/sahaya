@@ -1,7 +1,7 @@
 <div align="center">
-  <h1>🤝 Sahaya</h1>
-  <p><strong>A Next-Generation AI-Driven NGO Operations & Volunteer Mobilization Platform.</strong></p>
-  <p><i>Built for the Google Solution Challenge 2026</i></p>
+  <h1>Sahaya</h1>
+  <p><strong>AI-Driven NGO Operations and Volunteer Mobilization Platform</strong></p>
+  <p><i>Google Solution Challenge 2026 Submission</i></p>
 
   [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev/)
   [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
@@ -9,93 +9,247 @@
   [![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlebard&logoColor=white)](https://ai.google.dev/)
 </div>
 
-<br/>
+## Problem Statement: Smart Resource Allocation
+Local social groups and NGOs collect critical community-needs data through surveys, field reports, and media. This data is fragmented across sources, making urgent priorities difficult to identify and slowing volunteer response.
 
-## 🌍 The Mission
-During crises or daily operations, NGOs face massive logistical bottlenecks. Data comes in chaotically (WhatsApp, phone calls, frantic texts), classifying tasks is mostly manual, and matching available volunteers manually is incredibly slow.
+Sahaya unifies scattered community data, ranks urgency, and coordinates data-driven volunteer deployment to the exact tasks and localities where impact is highest.
 
-**Sahaya** bridges the gap between chaotic on-the-ground reporting and intelligent, organized volunteer mobilization. We ingest raw field data through Telegram/App uploads, use AI to abstract it into actionable micro-tasks, and operationally route those tasks to the absolute best volunteer based on precise mathematical parameters. 
+## Objective
+Design and operate a production-ready system that:
+1. Aggregates fragmented community inputs into structured, actionable intelligence.
+2. Identifies urgent local needs with transparent prioritization.
+3. Matches available volunteers to task requirements using explainable scoring.
+4. Closes the loop with verification, feedback, and measurable impact metrics.
 
----
+## What Sahaya Does
+1. Ingests field reports from Telegram and app clients.
+2. Uses AI to extract structured problem cards and decomposes them into executable tasks.
+3. Calculates priority and dispatches tasks using skill, distance, availability, language, and trust signals.
+4. Supports real-time team coordination through role-specific chat and notifications.
+5. Verifies completion proof with AI rubric scoring and human-in-the-loop fallback.
 
-## ✨ Key Features
+## Latest Implemented Updates
+### Communication and Coordination
+- Dedicated chat hub for both Volunteer and NGO roles.
+- Thread-level unread tracking with read receipts per task.
+- In-app notification centers for both roles.
+- Unread indicators in dashboard, hub, and notification views.
+- Member detail sheet for task-level coordination chats.
 
-### 🏛️ For NGOs (Command Center)
-- **AI Task Abstraction:** Turn a single paragraph of text (or an audio note) into 3-4 structured, manageable tasks with estimated completion times using Google Gemini AI.
-- **KPI Dashboards & Heatmaps:** Get a bird's-eye view of your impact operations, geographical problem concentrations, and task success rates.
-- **Simulation Engine:** Predict SLA delays and coverage risks ahead of time by simulating "What if volunteer availability drops by 40%?".
-- **Autonomous Proof Verification:** Gemini Vision AI autonomously scales submitted volunteer evidence (like photos of fixed pipes) to check if the exact task parameters were met, massively reducing manual admin overhead.
+### SDG-17 Alignment
+- Problem classification migrated to full SDG 1-17 taxonomy.
+- SDG labels now drive type selection and on-card SDG display.
+- Legacy issue-type compatibility maintained through normalization.
 
-### 🏃 For Volunteers (Field App)
-- **Hyper-Personalized Matching:** You don't scroll through lists. The Engine pushes notifications directly to you calculated via **Haversine Distance**, **Skill Matching**, **Availability Windows**, and **Historical Trust Scores**.
-- **Offline-First Resilience:** In extreme low-connectivity zones, volunteers can accept tasks, finish them, and attach rich media proofs directly to a hardened local offline queue that flawlessly syncs using `server_wins` resolution once cellular networks are restored.
-- **Auto-Redispatch Security:** Can't make the task? Sahaya's backend automatically expires stale task acceptances to organically route the task to the *next* best volunteer without NGO intervention.
+### AI Reliability and Safety
+- AI edit responses are schema-sanitized before persistence.
+- Batch AI task refactor is constrained by allowed task schema and skill taxonomy.
+- AI extraction outputs are normalized and bounded before storage.
 
----
+### Proof Verification Intelligence
+- Proof verification upgraded from single confidence score to rubric scoring:
+  - taskEvidenceScore
+  - clarityScore
+  - geoTemporalPlausibilityScore
+  - tamperRiskScore
+- Auto-approval now uses rubric-weighted confidence and tamper safeguards.
 
-## 🛠 Tech Stack 
+### Matching and Dispatch Improvements
+- Adaptive match weighting based on historical outcome signals.
+- Explainable match factors persisted for auditability.
+- Stale acceptance redispatch loop for operational resilience.
 
-- **Frontend & Field Clients:** Flutter (Dart). Uses `flavorizr` to split the binary into exclusive `NGO` and `Volunteer` bundles. 
-- **AI & NLP Ecosystem:** Google `genai` (`gemini-flash-lite-latest`), ML Kit Text Recognition on-device pipeline.
-- **Backend Services:** Python 3 Flask API acting as a serverless-friendly FaaS webhook, managed chronologically via `APScheduler`.
-- **Database & Identity:** Firebase (Firestore NoSQL, Auth, Cloud Messaging).
-- **Blob & Media:** Cloudinary and Azure Webhooks for robust network handling outside native architectures.
+### Duplicate and Quality Controls
+- Fingerprint-based duplicate detection for uploads.
+- Near-duplicate clustering for problem cards using issue/location/text similarity.
+- Quality event logging for anomaly review.
 
----
+### Voice AI Pipeline
+- Voice extraction path implemented end-to-end with dedicated backend audio endpoint.
 
-## 🏗️ High-Level Data Flow
+## Key Features
+### NGO Command Center
+- AI extraction from text, document, image, and audio inputs.
+- AI-assisted single-card editing and batch task refactoring.
+- Priority scoring with component breakdown (severity, scale, recency, gap).
+- Review queue with proof verification workflow.
+- Impact dashboards, heatmaps, and scenario simulation.
 
+### Volunteer Field App
+- Personalized matching with explainable dispatch logic.
+- Task lifecycle actions with offline-sync conflict handling.
+- Proof submission and status feedback loop.
+- Real-time team chat and role-aware notifications.
+
+## Architecture Snapshot
 ```mermaid
 flowchart LR
-    A[Source: Field Telegram / App Intake] --> B(Flask Webhook)
-    B -->|Check Fingerprint| C{Fraud Prevention}
-    C -- Passed --> D[Gemini Extraction & Decomposition]
-    D -->|JSON Output| E[(Firestore: ProblemCards & Tasks)]
-    E --> F[Algorithmic Matching Engine]
-    F -->|Calc: Distance, Skill, Trust| G[Targeted Volunteer Apps]
+    A[Telegram / App Input] --> B[Flask Backend]
+    B --> C[Quality + Duplicate Checks]
+    C --> D[Gemini Extraction + Normalization]
+    D --> E[(Firestore Problem Cards / Tasks)]
+    E --> F[Adaptive Matching Engine]
+    F --> G[Volunteer Dispatch + Notifications]
+    G --> H[Proof Submission]
+    H --> I[AI Rubric Verification + NGO Review]
 ```
 
----
+## Judging Criteria Mapping
+### Technical Merit (40%)
+#### Technical Complexity
+- Multi-channel ingestion (text, media, Telegram, voice) and structured decomposition into problem cards and tasks.
+- End-to-end lifecycle pipeline: extraction, prioritization, matching, dispatch, chat coordination, proof verification, completion cascade.
+- Real-time bidirectional role architecture (NGO and Volunteer) with shared task state and read-receipt consistency.
 
-## 🚀 Quick Start / How to Run Locally
+#### AI Integration
+- AI is used where deterministic rules are insufficient:
+  - unstructured extraction to structured JSON,
+  - natural-language editing for cards/tasks,
+  - proof verification rubric scoring.
+- Deterministic controls are enforced around AI outputs:
+  - schema sanitization,
+  - bounded value normalization,
+  - constrained task taxonomies.
 
-### 1. Backend Webhook (Python/Flask)
-You will need your `.env` populated with `GEMINI_API_KEY`, `FIREBASE_CREDENTIALS`, and `CLOUDINARY` secrets.
+#### Performance and Scalability
+- Firestore stream-based UI updates reduce manual refresh overhead.
+- Batch writes and idempotent generation patterns reduce duplicate operations.
+- Adaptive matching weights learn from outcomes while preserving bounded scoring.
+- Containerized backend deployment supports rapid iteration, horizontal scaling, and rolling updates across cloud runtimes.
+
+#### Security and Privacy
+- Duplicate and anomaly controls: fingerprints, near-duplicate detection, quality event logs.
+- Trust-aware volunteer gating and redispatch safeguards.
+- Explicit offline sync conflict policy with audit logging (`server_wins` + conflict record).
+- Data minimization in extraction flow through anonymized descriptions.
+
+### User Experience (10%)
+#### Design and Navigation
+- Role-specific app flavors prevent cross-role UI noise and reduce cognitive load.
+- High-frequency workflows are one-tap accessible: chat hub, unread indicators, review queue, AI assist actions.
+
+#### User Flow
+- NGO flow: intake -> extraction -> review -> task generation -> dispatch -> proof review -> completion.
+- Volunteer flow: receive match -> accept/execute -> submit proof -> coordinate in chat -> completion feedback.
+- Reduced friction via in-context AI edits and batch task refactor tools.
+
+#### Accessibility
+- Clear visual hierarchy, status badges, and explicit labels across critical operations.
+- Localization-ready text wrappers and consistent interaction patterns across both app flavors.
+
+### Alignment With Cause (25%)
+#### Problem Definition
+- Directly targets real NGO bottlenecks: fragmented data, slow triage, delayed dispatch, and verification burden.
+
+#### Relevance of Solution
+- Every major module maps to the stated challenge:
+  - data consolidation,
+  - urgency scoring,
+  - resource matching,
+  - verified execution.
+
+#### Expected Impact
+- Expected improvements include reduced dispatch latency, faster issue closure, lower manual review load, and higher volunteer-task fit quality.
+
+### Innovation and Creativity (25%)
+#### Originality
+- Combines civic operations tooling, AI extraction, explainable matching, and trust-based verification into a single operational loop.
+
+#### Creative Use of Technologies
+- Uses Gemini for structured extraction and controlled edits while preserving deterministic governance.
+- Integrates Firebase real-time coordination with cloud-hosted backend orchestration.
+
+#### Future Potential
+- Built with extensible taxonomies, explainability traces, and operational metrics to support city-level rollout and policy-grade reporting.
+
+## Impact Measurement Framework
+Sahaya tracks measurable operational outcomes suitable for judging and real deployments:
+1. Time-to-triage: report ingestion to approved problem card.
+2. Time-to-dispatch: approved task to volunteer acceptance.
+3. Match quality: acceptance rate and proof approval rate by match score band.
+4. Completion velocity: median task completion duration by SDG category.
+5. Manual review reduction: ratio of auto-approved proofs vs manual reviews.
+6. Duplicate suppression rate: blocked duplicate/near-duplicate submissions.
+
+## Roadmap and Future Potential
+1. Model evaluation dashboards for extraction and proof rubric drift.
+2. Deeper accessibility compliance (screen-reader-first audits and action semantics).
+3. Cost-aware autoscaling strategy across backend workloads.
+4. Regional language expansion and voice-first intake optimization.
+5. NGO-level policy insights with longitudinal SDG trend analytics.
+
+## Technology Stack
+- Frontend: Flutter (Dart), role flavors (`ngo`, `volunteer`).
+- Backend: Python Flask (containerized, cloud-deployable).
+- AI: Google Gemini (`gemini-flash-lite-latest`).
+- Data: Firebase Firestore, Firebase Auth, Firebase Cloud Messaging.
+- Media: Cloudinary.
+- Scheduling: APScheduler.
+
+## Local Development
+### Backend (Flask)
+Required environment variables include `GEMINI_API_KEY`, Firebase credentials, and Cloudinary secrets.
+
 ```bash
 cd services/telegram-webhook
 python -m venv venv
 
-# Activate Environment
-# Windows: venv\Scripts\activate 
-# Mac/Linux: source venv/bin/activate
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+# source venv/bin/activate
 
 pip install -r requirements.txt
 python app.py
 ```
-*Note: This runs locally on port 5000. Use Ngrok to expose this port to Telegram/Azure webhooks if testing end-to-end integration.*
 
-### 2. Frontend Applications (Flutter)
-Ensure you have Flutter version `^3.11.4` installed. We use flavors to separate the app bundles.
-
+### Flutter Apps
 ```bash
-# Get all dependencies
 flutter pub get
 
-# To launch the NGO Command Center:
+# NGO app
 flutter run --flavor ngo -t lib/main_ngo.dart
 
-# To launch the Volunteer Field application:
+# Volunteer app
 flutter run --flavor volunteer -t lib/main_volunteer.dart
 ```
 
----
+## Production Deployment (Cloud-Native, Platform Agnostic)
+Sahaya deploys as a containerized backend service behind HTTPS with environment-based configuration and health checks.
 
-## 🛡️ Privacy & Fraud Guardrails 
-- **Duplicate Uploads:** Upload media/texts are hashed via `SHA-256`. Identical event reporting from multiple field workers is deduplicated to prevent database pollution.
-- **Volunteer Gaming Prevention:** A Trust Scoring system dynamically governs bounds. High-risk or complex tasks strictly demand volunteers who have passed continuous reliability checks.
+```bash
+cd services/telegram-webhook
 
-<br/>
+# Build container image
+docker build -t sahaya-backend:latest .
+
+# Push image to your container registry
+docker tag sahaya-backend:latest <registry>/sahaya-backend:latest
+docker push <registry>/sahaya-backend:latest
+
+# Deploy latest image to your managed container platform
+# (Cloud Run / ECS / Kubernetes / similar)
+
+# Verify readiness endpoint
+curl https://<your-domain>/health
+```
+
+Recommendation: use an always-on paid plan for production reliability, stable cold-start behavior, and predictable SLA.
+
+## Security and Integrity Controls
+- Upload fingerprinting and duplicate suppression.
+- Volunteer trust-score-aware matching guardrails.
+- Conflict logging for offline sync with explicit merge policy.
+- Verification anomaly tracking and quality event audit trails.
+
+## Evaluation Readiness
+Sahaya is prepared for challenge evaluation with explicit evidence across:
+1. Technical depth and robust implementation.
+2. Responsible and necessary AI integration.
+3. Cause alignment with measurable social impact outcomes.
+4. Innovation with clear pathway to long-term deployment.
 
 <div align="center">
-  <i>Empowering Civic Action Through Artificial Intelligence.</i>
+  <i>Operational intelligence for faster, safer, and more accountable civic response.</i>
 </div>
