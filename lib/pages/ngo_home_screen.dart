@@ -11,8 +11,9 @@ import 'ngo_task_detail_screen.dart';
 import 'ngo_create_problem_screen.dart';
 import 'proof_review_screen.dart';
 
-String _sdgTagForIssue(IssueType issue) {
-  return issue.sdgTag;
+String _sdgDisplayLabel(IssueType issue) {
+  final name = issue.label.replaceFirst(RegExp(r'^SDG\s+\d+\s*-\s*'), '');
+  return '${issue.sdgTag} | $name';
 }
 
 class NgoHomeScreen extends StatelessWidget {
@@ -440,30 +441,22 @@ class NgoTaskBlock extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 _miniPill(
                   context,
-                  card.issueType.name.replaceAll('_', ' ').toUpperCase(),
+                  _sdgDisplayLabel(card.issueType),
                   cs.primary.withValues(alpha: 0.1),
                   cs.primary,
                 ),
-                const SizedBox(width: 8),
                 _miniPill(
                   context,
-                  _sdgTagForIssue(card.issueType),
-                  const Color(0xFF0EA5E9).withValues(alpha: 0.12),
-                  const Color(0xFF0369A1),
-                ),
-                const Spacer(),
-                T(
                   'PRIORITY ${card.priorityScore.toInt()}',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w900,
-                    color: severityColor,
-                    fontSize: 11,
-                    letterSpacing: 0.5,
-                  ),
+                  severityColor.withValues(alpha: 0.12),
+                  severityColor,
                 ),
               ],
             ),

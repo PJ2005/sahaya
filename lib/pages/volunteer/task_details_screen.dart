@@ -43,6 +43,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   String _ngoEmail = '';
   String _ngoPhone = '';
 
+  String _cleanPhone(String? raw) {
+    return (raw ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -58,11 +62,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       if (problemDoc.exists && problemDoc.data() != null) {
         final ngoId = problemDoc.data()!['ngoId'];
         if (ngoId != null) {
-          final ngoDoc = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
-          if (ngoDoc.exists) { 
-            ngoName = ngoDoc['name'] ?? ngoName; 
-            ngoEmail = ngoDoc['email'] ?? ''; 
-            ngoPhone = ngoDoc['phone'] ?? ''; 
+          final ngoDoc = await FirebaseFirestore.instance.collection('ngo_profiles').doc(ngoId).get();
+          if (ngoDoc.exists) {
+            ngoName = ngoDoc['name'] ?? ngoName;
+            ngoEmail = ngoDoc['email'] ?? '';
+            ngoPhone = _cleanPhone(ngoDoc['phone'] as String?);
           }
         }
       }
@@ -97,8 +101,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (problemDoc.exists && problemDoc.data() != null) {
       final ngoId = problemDoc.data()!['ngoId'];
       if (ngoId != null) {
-        final ngoDoc = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
-        if (ngoDoc.exists) { ngoName = ngoDoc['name'] ?? ngoName; ngoEmail = ngoDoc['email'] ?? ''; ngoPhone = ngoDoc['phone'] ?? ''; }
+        final ngoDoc = await FirebaseFirestore.instance.collection('ngo_profiles').doc(ngoId).get();
+        if (ngoDoc.exists) {
+          ngoName = ngoDoc['name'] ?? ngoName;
+          ngoEmail = ngoDoc['email'] ?? '';
+          ngoPhone = _cleanPhone(ngoDoc['phone'] as String?);
+        }
       }
     }
 

@@ -51,6 +51,10 @@ class ActiveTaskScreen extends StatefulWidget {
 class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   late Future<Map<String, String>> _ngoInfoFuture;
 
+  String _cleanPhone(String? raw) {
+    return (raw ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -74,13 +78,22 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
       final ngoId = problemDoc.data()?['ngoId'];
       if (ngoId == null) throw 'NGO ID missing';
 
-      final ngoDoc = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
-      if (!ngoDoc.exists) throw 'NGO Profile not found';
+      final ngoDoc = await FirebaseFirestore.instance.collection('ngo_profiles').doc(ngoId).get();
+      if (ngoDoc.exists) {
+        return {
+          'name': ngoDoc['name'] ?? 'Coordinator',
+          'phone': _cleanPhone(ngoDoc['phone'] as String?),
+          'email': ngoDoc['email'] ?? '',
+        };
+      }
+
+      final legacyDoc = await FirebaseFirestore.instance.collection('users').doc(ngoId).get();
+      if (!legacyDoc.exists) throw 'NGO Profile not found';
 
       return {
-        'name': ngoDoc['name'] ?? 'Coordinator',
-        'phone': ngoDoc['phone'] ?? '',
-        'email': ngoDoc['email'] ?? '',
+        'name': legacyDoc['name'] ?? 'Coordinator',
+        'phone': _cleanPhone(legacyDoc['phone'] as String?),
+        'email': legacyDoc['email'] ?? '',
       };
     } catch (e) {
       return {
@@ -106,7 +119,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   }
 
   void _callCoordinator(String? phoneInput) async {
-    final phone = (phoneInput ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+    final phone = _cleanPhone(phoneInput);
     if (phone.isEmpty) return;
     final url = Uri.parse('tel:$phone');
     try {
@@ -115,7 +128,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   }
 
   void _callCoordinatorDirect() async {
-    final phone = widget.coordinatorPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final phone = _cleanPhone(widget.coordinatorPhone);
     if (phone.isEmpty) return;
     final url = Uri.parse('tel:$phone');
     try {

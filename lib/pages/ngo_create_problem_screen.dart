@@ -328,17 +328,63 @@ class _NgoCreateProblemScreenState extends State<NgoCreateProblemScreen> with Si
           children: [
             DropdownButtonFormField<IssueType>(
               initialValue: _issueType,
-              decoration: InputDecoration(labelText: 'SDG Type', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              items: IssueType.values
-                  .map((v) => DropdownMenuItem(value: v, child: T(v.label)))
-                  .toList(),
+                isExpanded: true,
+                decoration: InputDecoration(labelText: 'SDG Type', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                selectedItemBuilder: (context) => IssueType.values
+                    .map(
+                      (v) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          v.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                items: IssueType.values
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(
+                          v.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
               onChanged: (v) => setState(() => _issueType = v!),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<SeverityLevel>(
               initialValue: _severityLevel,
-              decoration: InputDecoration(labelText: 'Severity', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              items: SeverityLevel.values.map((v) => DropdownMenuItem(value: v, child: T(v.name.toUpperCase()))).toList(),
+                isExpanded: true,
+                decoration: InputDecoration(labelText: 'Severity', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                selectedItemBuilder: (context) => SeverityLevel.values
+                    .map(
+                      (v) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          v.name.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                items: SeverityLevel.values
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(
+                          v.name.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
               onChanged: (v) => setState(() => _severityLevel = v!),
             ),
             const SizedBox(height: 16),

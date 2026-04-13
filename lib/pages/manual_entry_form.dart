@@ -97,14 +97,31 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
               children: [
                 DropdownButtonFormField<IssueType>(
                   initialValue: _issueType,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'SDG Type',
                   ),
+                  selectedItemBuilder: (context) => IssueType.values
+                      .map(
+                        (v) => Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            v.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
                   items: IssueType.values
                       .map(
                         (v) => DropdownMenuItem(
                           value: v,
-                          child: T(v.label),
+                          child: Text(
+                            v.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -112,14 +129,31 @@ class _ManualEntryFormDialogState extends State<ManualEntryFormDialog> {
                 ),
                 DropdownButtonFormField<SeverityLevel>(
                   initialValue: _severityLevel,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Structural Severity',
                   ),
+                  selectedItemBuilder: (context) => SeverityLevel.values
+                      .map(
+                        (v) => Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            v.name.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
                   items: SeverityLevel.values
                       .map(
                         (v) => DropdownMenuItem(
                           value: v,
-                          child: T(v.name.toUpperCase()),
+                          child: Text(
+                            v.name.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),

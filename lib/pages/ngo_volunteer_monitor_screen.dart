@@ -114,7 +114,7 @@ class _MissionTrackingTab extends StatelessWidget {
               return const _EmptyPlaceholder(icon: Icons.hail_rounded, title: 'Awaiting Heroes', subtitle: 'No missions have been generated for your problems.');
             }
 
-            // Query ALL match_records for these tasks to see who joined
+            // Use task assignments as source of truth; match_records only backfills older rows.
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('match_records')
@@ -122,21 +122,25 @@ class _MissionTrackingTab extends StatelessWidget {
                   .snapshots(),
               builder: (context, matchSnap) {
                 if (matchSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                
+
+                final Map<String, Set<String>> assignmentSets = {
+                  for (final t in tasks.where((t) => t.status != TaskStatus.done && t.assignedVolunteerIds.isNotEmpty))
+                    t.id: {...t.assignedVolunteerIds}
+                };
+
                 final allMatches = matchSnap.data?.docs ?? [];
-                // Group matches by taskId
-                final Map<String, List<String>> assignments = {};
                 for (final m in allMatches) {
                   final data = m.data() as Map<String, dynamic>;
-                  final tid = data['taskId'] as String;
-                  final vid = data['volunteerId'] as String;
-                  final status = data['status'] as String;
+                  final tid = data['taskId'] as String?;
+                  final vid = data['volunteerId'] as String?;
+                  final status = (data['status'] as String? ?? '').toLowerCase();
+                  if (tid == null || vid == null) continue;
                   if (status == 'accepted' || status == 'proof_submitted' || status == 'proof_rejected') {
-                    assignments.putIfAbsent(tid, () => []).add(vid);
+                    assignmentSets.putIfAbsent(tid, () => <String>{}).add(vid);
                   }
                 }
 
-                final assignedTasks = tasks.where((t) => assignments.containsKey(t.id)).toList();
+                final assignedTasks = tasks.where((t) => assignmentSets[t.id]?.isNotEmpty ?? false).toList();
 
                 if (assignedTasks.isEmpty) {
                   return const _EmptyPlaceholder(icon: Icons.hail_rounded, title: 'Awaiting Heroes', subtitle: 'No volunteers have accepted missions yet.');
@@ -149,7 +153,7 @@ class _MissionTrackingTab extends StatelessWidget {
                     final task = assignedTasks[i];
                     return _AssignmentGroupCard(
                       task: task,
-                      volunteerIds: assignments[task.id] ?? [],
+                      volunteerIds: (assignmentSets[task.id] ?? <String>{}).toList(),
                     );
                   },
                 );

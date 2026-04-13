@@ -502,13 +502,13 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           return _emptyState(icon: Icons.radar_rounded, title: 'No missions nearby', subtitle: 'Stay tuned! New tasks appear as needs arise.');
         }
 
-        final allTasks = taskSnapshot.data!.docs.map((doc) {
+        final availableTasks = taskSnapshot.data!.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           data['id'] = doc.id; // Map document ID to model ID correctly
           return TaskModel.fromJson(data);
-        }).toList();
+        }).where((t) => !t.assignedVolunteerIds.contains(widget.uid)).toList();
 
-        final scored = allTasks.map((task) {
+        final scored = availableTasks.map((task) {
           final scoreData = _calculateDynamicScore(task, profile);
           return {'task': task, 'score': scoreData['score'] as int, 'why': scoreData['why'] as String};
         }).toList();
@@ -535,18 +535,88 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
 
   Widget _buildMyMissionsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('match_records').where('volunteerId', isEqualTo: widget.uid).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return _skeleton();
-        final docs = snapshot.data?.docs ?? [];
-        final active = docs.where((d) {
-          final s = d['status'] as String? ?? '';
-          return s == 'accepted' || s == 'proof_submitted' || s == 'proof_rejected';
-        }).toList();
+      stream: FirebaseFirestore.instance
+          .collection('tasks')
+          .where('assignedVolunteerIds', arrayContains: widget.uid)
+          .snapshots(),
+      builder: (context, taskSnap) {
+        if (taskSnap.connectionState == ConnectionState.waiting) return _skeleton();
+        final taskDocs = taskSnap.data?.docs ?? [];
+        if (taskDocs.isEmpty) {
+          return _emptyState(
+            icon: Icons.assignment_rounded,
+            title: 'No active missions',
+            subtitle: 'Join missions from the Available tab.',
+          );
+        }
 
-        if (active.isEmpty) return _emptyState(icon: Icons.assignment_rounded, title: 'No active missions', subtitle: 'Join missions from the Available tab.');
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('match_records')
+              .where('volunteerId', isEqualTo: widget.uid)
+              .snapshots(),
+          builder: (context, matchSnap) {
+            if (matchSnap.connectionState == ConnectionState.waiting) return _skeleton();
 
-        return _missionList(active, isAccepted: true);
+            final matchDocs = matchSnap.data?.docs ?? [];
+            final Map<String, QueryDocumentSnapshot> matchByTaskId = {};
+            for (final m in matchDocs) {
+              final data = m.data() as Map<String, dynamic>;
+              final taskId = data['taskId'] as String?;
+              if (taskId != null && taskId.isNotEmpty) {
+                matchByTaskId[taskId] = m;
+              }
+            }
+
+            final activeTaskDocs = taskDocs.where((doc) {
+              final taskMap = doc.data() as Map<String, dynamic>;
+              final taskStatus = (taskMap['status'] as String?) ?? 'open';
+              if (taskStatus == 'done') return false;
+
+              final matchDoc = matchByTaskId[doc.id];
+              if (matchDoc == null) {
+                // Fallback: assigned task without a visible match record should still be shown.
+                return true;
+              }
+              final matchMap = matchDoc.data() as Map<String, dynamic>;
+              final matchStatus = (matchMap['status'] as String?) ?? '';
+              return matchStatus == 'accepted' ||
+                  matchStatus == 'proof_submitted' ||
+                  matchStatus == 'proof_rejected' ||
+                  matchStatus == 'open' ||
+                  matchStatus == 'assigned';
+            }).toList();
+
+            if (activeTaskDocs.isEmpty) {
+              return _emptyState(
+                icon: Icons.assignment_rounded,
+                title: 'No active missions',
+                subtitle: 'Join missions from the Available tab.',
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              itemCount: activeTaskDocs.length,
+              itemBuilder: (context, i) {
+                final doc = activeTaskDocs[i];
+                final taskMap = doc.data() as Map<String, dynamic>;
+                taskMap['id'] = doc.id;
+                final task = TaskModel.fromJson(taskMap);
+                final matchDoc = matchByTaskId[doc.id];
+                final matchMap = matchDoc?.data() as Map<String, dynamic>?;
+
+                return MissionCard(
+                  task: task,
+                  matchRecordId: matchDoc?.id ?? '',
+                  matchScore: (matchMap?['matchScore'] as num?)?.toInt() ?? 0,
+                  isAccepted: true,
+                  whyMatched: (matchMap?['whyMatched'] as String?) ?? '',
+                );
+              },
+            );
+          },
+        );
       },
     );
   }
@@ -575,7 +645,9 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance.collection('tasks').doc(d['taskId']).get(),
           builder: (context, taskSnap) {
-            if (!taskSnap.hasData || !taskSnap.data!.exists) return const SizedBox.shrink();
+              if (!taskSnap.hasData || !taskSnap.data!.exists) {
+                return _archivedMissionCard(d);
+              }
             final task = TaskModel.fromJson(taskSnap.data!.data() as Map<String, dynamic>);
             return MissionCard(
               task: task,
@@ -588,6 +660,50 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen>
           },
         );
       },
+    );
+  }
+
+  Widget _archivedMissionCard(Map<String, dynamic> matchData) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final briefing = (matchData['missionBriefing'] as String?)?.trim();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? SahayaColors.darkBorder : SahayaColors.lightBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: T(
+                  briefing?.isNotEmpty == true
+                      ? briefing!
+                      : 'Mission details unavailable',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          T(
+            'This mission is still linked to your record, but task details are currently unavailable.',
+            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
     );
   }
 
