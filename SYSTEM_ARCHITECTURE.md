@@ -105,27 +105,27 @@ flowchart LR
     subgraph Flutter NGO
       NGO_D[ngo_dashboard]
       NGO_H[ngo_home_screen]
-      NGO_R[review_queue/proof screens]
-      NGO_C[ngo_chat_hub + notifications]
-      NGO_I[impact + heatmap + monitor]
+      NGO_R["review_queue/proof screens"]
+      NGO_C["ngo_chat_hub + notifications"]
+      NGO_I["impact + heatmap + monitor"]
     end
 
     subgraph Flutter Volunteer
-      VOL_G[volunteer_gateway/auth/onboarding]
+      VOL_G["volunteer_gateway/auth/onboarding"]
       VOL_H[volunteer_home_screen]
       VOL_A[active_task_screen]
-      VOL_C[task_chat + chat_hub]
+      VOL_C["task_chat + chat_hub"]
       VOL_N[volunteer_notifications]
     end
 
     subgraph Shared UI/Logic
-      COMP[components/*]
-      SVC[services/*]
-      MOD[models/*]
-      THM[theme/* + l10n]
+      COMP["components/*"]
+      SVC["services/*"]
+      MOD["models/*"]
+      THM["theme/* + l10n"]
     end
 
-    subgraph Backend Components
+    subgraph Backend_Components
       ING[Webhook ingestion]
       EX[Extraction + normalization]
       GEN[Task generation]
@@ -148,8 +148,9 @@ flowchart LR
     VOL_C --> MOD
     VOL_N --> MOD
 
-    SVC --> Backend Components
-    Backend Components --> MOD
+    SVC --> ING
+    ING --> MOD
+
     THM --> NGO_D
     THM --> VOL_H
 ```
@@ -480,7 +481,7 @@ flowchart LR
       PC[(problem_cards)]
       T[(tasks)]
       MR[(match_records)]
-      TN[(task_chats/{taskId}/messages)]
+      TN[("task_chats/{taskId}/messages")]
       NN[(ngo_notifications)]
       VN[(volunteer_notifications)]
       QE[(quality_events)]
