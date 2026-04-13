@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../theme/sahaya_theme.dart';
 import '../utils/translator.dart';
+import 'ngo_dashboard.dart';
 
 
 class ReviewDetailScreen extends StatefulWidget {
@@ -69,31 +70,46 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             .update({'status': 'done', 'problemCardId': _cardId});
       }
 
+      final ngoId =
+          (widget.upload?.ngoId ?? widget.extraction['ngoId'] ?? '')
+              .toString();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: T('Building Action Plan & Connecting Volunteers...'), duration: Duration(seconds: 2)),
         );
       }
 
-      // Synchronously route to Python Backend Matcher/Decomposer
-      try {
-        final backendUrl = dotenv.env['BACKEND_URL'] ?? 'https://telegram-webhook-c7dxdhg6czb6bpdt.southindia-01.azurewebsites.net';
-        final response = await http.post(
-          Uri.parse('$backendUrl/generate-tasks'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'problemCardId': _cardId,
-            'ngoId': widget.upload?.ngoId ?? widget.extraction['ngoId'],
-          }),
-        );
-        if (response.statusCode != 200) {
-          debugPrint('Flask matching sequence failed cleanly: ${response.body}');
+      if (mounted) {
+        if (ngoId.isNotEmpty) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => NgoDashboard(ngoId: ngoId)),
+            (route) => false,
+          );
+        } else {
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
-      } catch (e) {
-         debugPrint('Flask unreachable natively: $e');
       }
 
-      if (mounted) Navigator.pop(context);
+      // Fire and forget: user should not wait for backend decomposition/matching.
+      Future<void>(() async {
+        try {
+          final backendUrl = dotenv.env['BACKEND_URL'] ?? 'https://telegram-webhook-c7dxdhg6czb6bpdt.southindia-01.azurewebsites.net';
+          final response = await http.post(
+            Uri.parse('$backendUrl/generate-tasks'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'problemCardId': _cardId,
+              'ngoId': ngoId,
+            }),
+          );
+          if (response.statusCode != 200) {
+            debugPrint('Flask matching sequence failed cleanly: ${response.body}');
+          }
+        } catch (e) {
+          debugPrint('Flask unreachable natively: $e');
+        }
+      });
     } catch (e) {
       debugPrint('Error approving: $e');
       setState(() => _saving = false);
@@ -111,19 +127,6 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           'Review Extraction',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_awesome),
-            onPressed: () => AiAssistantSheet.show(
-              context,
-              currentData: _editedData,
-              contextDescription: 'an AI extraction review',
-              onResult: (mod) {
-                setState(() => _editedData = mod);
-              },
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -132,6 +135,26 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           children: [
             // Media Preview
             _buildMediaPreview(upload),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.tonalIcon(
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const T(
+                  'AI Assistant',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                onPressed: () => AiAssistantSheet.show(
+                  context,
+                  currentData: _editedData,
+                  contextDescription: 'an AI extraction review',
+                  onResult: (mod) {
+                    setState(() => _editedData = mod);
+                  },
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
 
             // Form
@@ -179,14 +202,33 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Center(
-              child: TextButton(
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
                 onPressed: () => Navigator.pop(context),
-                child: T(
-                  'Discard Extraction',
-                  style: TextStyle(
-                    color: SahayaColors.coral,
-                    fontWeight: FontWeight.w700,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SahayaColors.coral,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  side: BorderSide(
+                    color: SahayaColors.coral.withValues(alpha: 0.45),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.close_rounded, size: 18),
+                      const SizedBox(width: 8),
+                      const T(
+                        'Discard Extraction',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
                 ),
               ),

@@ -1,5 +1,37 @@
 .env
+.env.*
+!.env.example
 sahaya-7df6d-firebase-adminsdk-fbsvc-ca821d9e1b.json
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+**/serviceAccount*.json
+
+# Local temp/cache folders
+.tmp/
+tmp/
+temp/
+
+# Python backend virtualenv/cache
+venv/
+.venv/
+env/
+__pycache__/
+**/__pycache__/
+*.pyd
+*.pyo
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Backend/runtime local files
+services/telegram-webhook/.env
+services/telegram-webhook/.env.*
+services/telegram-webhook/instance/
+services/telegram-webhook/*.sqlite
+services/telegram-webhook/*.db
+services/telegram-webhook/*.db-*
+services/telegram-webhook/*.pid
 
 # Miscellaneous
 *.class
@@ -29,12 +61,38 @@ migrate_working_dir/
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
+**/.dart_tool/
 .dart_tool/
 .flutter-plugins-dependencies
+.flutter-plugins
 .pub-cache/
 .pub/
 /build/
 /coverage/
+
+# Flutter platform generated artifacts
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/macos/Flutter/ephemeral/
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+
+# CocoaPods/symlink artifacts
+**/ios/Pods/
+**/ios/.symlinks/
+**/macos/Pods/
+**/macos/.symlinks/
+
+# Firebase and emulator logs
+.firebase/
+firebase-debug.log
+ui-debug.log
+firestore-debug.log
+pubspec_overrides.yaml
 
 # Symbolication related
 app.*.symbols
@@ -46,3 +104,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Signing keys and certificates
+*.jks
+*.keystore
+*.p12
+*.cer

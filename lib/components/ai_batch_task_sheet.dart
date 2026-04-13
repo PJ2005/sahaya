@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/gemini_service.dart';
+import '../theme/sahaya_theme.dart';
 import '../utils/translator.dart';
 
 
@@ -180,14 +181,20 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final originalCount = widget.taskDocs.length;
+    final surfaceColor = isDark ? SahayaColors.darkSurface : Colors.white;
+    final inputFill = isDark ? SahayaColors.darkBg : const Color(0xFFF8FAFC);
+    final successBg = isDark ? const Color(0xFF0D2217) : const Color(0xFFF0FDF4);
 
     return Container(
       margin: const EdgeInsets.only(top: 60),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
@@ -198,11 +205,11 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
@@ -210,16 +217,14 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                      ),
-                      borderRadius: BorderRadius.circular(10),
+                      color: cs.primary.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
+                    child: Icon(
+                      Icons.auto_awesome_rounded,
+                      color: cs.primary,
                       size: 18,
                     ),
                   ),
@@ -228,18 +233,19 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const T(
+                        T(
                           'AI Task Refactor',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
+                            color: cs.onSurface,
                           ),
                         ),
                         T(
                           '$originalCount tasks loaded — describe changes for all',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Colors.black45,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -258,32 +264,30 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                       decoration: InputDecoration(
                         hintText:
                             'e.g. "Merge the first two tasks, add a medical assessment task, set all durations to 4h"',
-                        hintStyle: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.black26,
+                        hintStyle: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[50],
+                        fillColor: inputFill,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 12,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
+                          borderSide: BorderSide(color: cs.outlineVariant),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
+                          borderSide: BorderSide(color: cs.outlineVariant),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF6366F1),
-                          ),
+                          borderSide: BorderSide(color: cs.primary, width: 1.5),
                         ),
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
                       maxLines: 3,
                       minLines: 1,
                       textInputAction: TextInputAction.send,
@@ -292,20 +296,23 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                   ),
                   const SizedBox(width: 8),
                   Material(
-                    color: const Color(0xFF6366F1),
+                    color: cs.primary,
                     borderRadius: BorderRadius.circular(16),
                     child: InkWell(
                       onTap: _loading ? null : _submit,
                       borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: 52,
+                        height: 52,
                         child: _loading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               )
                             : const Icon(
@@ -323,7 +330,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                 const SizedBox(height: 10),
                 T(
                   'Error: $_error',
-                  style: const TextStyle(fontSize: 11, color: Colors.red),
+                  style: TextStyle(fontSize: 11, color: cs.error),
                 ),
               ],
 
@@ -333,30 +340,41 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
+                    color: successBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: SahayaColors.emerald.withValues(alpha: 0.35),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.check_circle,
-                            color: Colors.green,
+                            color: SahayaColors.emerald,
                             size: 16,
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6),
                           T(
-                            'Result: ${_preview!.length} tasks (was $originalCount)',
-                            style: const TextStyle(
+                            'AI Suggestion Preview',
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
-                              color: Colors.green,
+                              color: SahayaColors.emerald,
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      T(
+                        'Result: ${_preview!.length} tasks (was $originalCount)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ..._preview!.asMap().entries.map((entry) {
@@ -390,7 +408,7 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                                     vertical: 1,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.15),
+                                    color: SahayaColors.emerald.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const T(
@@ -398,16 +416,16 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                                     style: TextStyle(
                                       fontSize: 8,
                                       fontWeight: FontWeight.w800,
-                                      color: Colors.green,
+                                      color: SahayaColors.emerald,
                                     ),
                                   ),
                                 ),
                               Expanded(
                                 child: T(
                                   '${type.toUpperCase()} — $desc',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.black87,
+                                    color: cs.onSurface,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -417,15 +435,23 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                           ),
                         );
                       }),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          TextButton(
+                          OutlinedButton(
                             onPressed: () => setState(() => _preview = null),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 42),
+                              side: BorderSide(color: cs.error.withValues(alpha: 0.45)),
+                              foregroundColor: cs.error,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                             child: const T(
                               'Discard',
-                              style: TextStyle(color: Colors.red, fontSize: 12),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -440,8 +466,12 @@ class _AiBatchTaskSheetState extends State<AiBatchTaskSheet> {
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
+                              minimumSize: const Size(0, 42),
+                              backgroundColor: SahayaColors.emerald,
                               foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ],

@@ -72,54 +72,59 @@ class VolunteerTeamList extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 100,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: volunteerIds.length,
-            itemBuilder: (context, index) {
-              final uid = volunteerIds[index];
-              return FutureBuilder<Map<String, String>>(
-                future: _resolveVolunteerIdentity(uid),
-                builder: (context, snapshot) {
-                  final resolved = snapshot.data;
-                  final name = resolved?['name'] ?? '...';
-                  final initials = resolved?['initials'] ?? '?';
+          height: 108,
+          child: Scrollbar(
+            thumbVisibility: volunteerIds.length > 3,
+            radius: const Radius.circular(8),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: volunteerIds.length,
+              itemBuilder: (context, index) {
+                final uid = volunteerIds[index];
+                return FutureBuilder<Map<String, String>>(
+                  future: _resolveVolunteerIdentity(uid),
+                  builder: (context, snapshot) {
+                    final resolved = snapshot.data;
+                    final name = resolved?['name'] ?? '...';
+                    final initials = resolved?['initials'] ?? '?';
 
-                  return Container(
-                    width: 80,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: cs.primary.withValues(alpha: 0.1),
-                          child: Text(
-                            initials,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.bold,
-                              color: cs.primary,
+                    return Container(
+                      width: 82,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: cs.primary.withValues(alpha: 0.1),
+                            child: Text(
+                              initials,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold,
+                                color: cs.primary,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted,
+                          const SizedBox(height: 8),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? SahayaColors.darkMuted : SahayaColors.lightMuted,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],

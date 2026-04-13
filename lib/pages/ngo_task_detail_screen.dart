@@ -225,19 +225,91 @@ class _TasksList extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-              child: Row(
-                children: [
-                  T('VOLUNTEER MISSIONS', 
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: cs.onSurfaceVariant, letterSpacing: 1)),
-                  const Spacer(),
-                  if (tasks.isNotEmpty)
-                    TextButton.icon(
-                      onPressed: () => AiBatchTaskSheet.show(context, problemCardId: problemCardId, taskDocs: tasks),
-                      icon: const Icon(Icons.auto_awesome, size: 14),
-                      label: const T('AI Refactor', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF6366F1), padding: const EdgeInsets.symmetric(horizontal: 6)),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 430;
+                  final action = ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: 42,
+                      maxWidth: compact ? constraints.maxWidth : 240,
                     ),
-                ],
+                    child: FilledButton.icon(
+                      onPressed: () => AiBatchTaskSheet.show(
+                        context,
+                        problemCardId: problemCardId,
+                        taskDocs: tasks,
+                      ),
+                      icon: const Icon(Icons.auto_awesome, size: 18),
+                      label: const T(
+                        'AI Refactor Tasks',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      style: FilledButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.padded,
+                        minimumSize: const Size(0, 42),
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  );
+
+                  if (tasks.isEmpty) {
+                    return T(
+                      'VOLUNTEER MISSIONS',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: cs.onSurfaceVariant,
+                        letterSpacing: 1,
+                      ),
+                    );
+                  }
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        T(
+                          'VOLUNTEER MISSIONS',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurfaceVariant,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(width: double.infinity, child: action),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: T(
+                          'VOLUNTEER MISSIONS',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurfaceVariant,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      action,
+                    ],
+                  );
+                },
               ),
             ),
             if (tasks.isEmpty)
@@ -322,37 +394,78 @@ class _TaskItem extends StatelessWidget {
               title: 'Active Contributors',
             ),
             const SizedBox(height: 12),
-            _actionBtn(context, Icons.forum_outlined, 'Coordination Chat', cs.primary, () {
-               Navigator.push(context, MaterialPageRoute(
-                builder: (_) => TaskChatScreen(
-                  taskId: doc.id,
-                  taskTitle: taskType.toUpperCase(),
-                  profileCollection: 'ngo_profiles',
-                ),
-              ));
-            }),
+            Align(
+              alignment: Alignment.center,
+              child: _actionBtn(
+                context,
+                Icons.forum_outlined,
+                'Coordination Chat',
+                cs.primary,
+                () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => TaskChatScreen(
+                      taskId: doc.id,
+                      taskTitle: taskType.toUpperCase(),
+                      profileCollection: 'ngo_profiles',
+                    ),
+                  ));
+                },
+                fullWidth: true,
+              ),
+            ),
           ],
 
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              _actionBtn(context, Icons.auto_awesome, 'AI Update', const Color(0xFF6366F1), () {
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.center,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _actionBtn(
+                    context,
+                    Icons.edit_outlined,
+                    'Edit Task',
+                    cs.primary,
+                    () {
+                      showDialog(context: context, builder: (_) => _TaskEditorDialog(
+                        problemCardId: task['problemCardId'],
+                        existingTask: task,
+                        existingDocId: doc.id,
+                      ));
+                    },
+                    fullWidth: true,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _actionBtn(
+                    context,
+                    Icons.delete_outline_rounded,
+                    'Delete Task',
+                    SahayaColors.coral,
+                    () => _deleteTask(context),
+                    destructive: true,
+                    fullWidth: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.center,
+            child: _actionBtn(
+              context,
+              Icons.auto_awesome,
+              'AI Update',
+              const Color(0xFF6366F1),
+              () {
                 AiAssistantSheet.show(context, currentData: task, contextDescription: 'a volunteer task', onResult: (mod) async {
                   await FirebaseFirestore.instance.collection('tasks').doc(doc.id).update(mod);
                 });
-              }),
-              const SizedBox(width: 8),
-              _actionBtn(context, Icons.edit_outlined, 'Edit', cs.primary, () {
-                showDialog(context: context, builder: (_) => _TaskEditorDialog(
-                  problemCardId: task['problemCardId'],
-                  existingTask: task,
-                  existingDocId: doc.id,
-                ));
-              }),
-              const SizedBox(width: 8),
-              _actionBtn(context, Icons.delete_outline_rounded, 'Delete', SahayaColors.coral, () => _deleteTask(context)),
-            ],
+              },
+              fullWidth: true,
+            ),
           ),
         ],
       ),
@@ -377,25 +490,60 @@ class _TaskItem extends StatelessWidget {
     );
   }
 
-  Widget _actionBtn(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
-            T(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-          ],
-        ),
-      ),
-    );
+  Widget _actionBtn(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap, {
+    bool destructive = false,
+    bool fullWidth = false,
+  }) {
+    final style = destructive
+        ? FilledButton.styleFrom(
+            backgroundColor: color.withValues(alpha: 0.12),
+            foregroundColor: color,
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: color.withValues(alpha: 0.4)),
+            ),
+          )
+        : OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color.withValues(alpha: 0.35)),
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          );
+
+    final button = destructive
+        ? FilledButton.icon(
+            onPressed: onTap,
+            style: style,
+            icon: Icon(icon, size: 18),
+            label: T(
+              label,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          )
+        : OutlinedButton.icon(
+            onPressed: onTap,
+            style: style,
+            icon: Icon(icon, size: 18),
+            label: T(
+              label,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          );
+
+    if (fullWidth) {
+      return SizedBox(width: double.infinity, child: button);
+    }
+    return button;
   }
 
   void _deleteTask(BuildContext context) async {
@@ -513,7 +661,12 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
             Wrap(
               spacing: 4,
               children: _defaultSkills.map((s) => FilterChip(
-                label: T(s.replaceAll('_', ' '), style: const TextStyle(fontSize: 10)),
+                label: T(
+                  s.replaceAll('_', ' '),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
                 selected: _selectedSkills.contains(s),
                 onSelected: (v) => setState(() => v ? _selectedSkills.add(s) : _selectedSkills.remove(s)),
               )).toList(),
@@ -521,8 +674,28 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: _customTagController, decoration: const InputDecoration(labelText: 'Custom tag', isDense: true), onSubmitted: (_) => _addCustomTag())),
-                IconButton(onPressed: _addCustomTag, icon: Icon(Icons.add_circle, color: Theme.of(context).colorScheme.primary)),
+                Expanded(
+                  child: TextField(
+                    controller: _customTagController,
+                    decoration: const InputDecoration(labelText: 'Custom tag'),
+                    onSubmitted: (_) => _addCustomTag(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: _addCustomTag,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const T(
+                    'Add',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(88, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ],
             ),
           ],

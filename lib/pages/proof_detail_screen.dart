@@ -591,20 +591,27 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            SizedBox(
-              height: 56,
-              width: 64,
-              child: OutlinedButton(
-                onPressed: _processing ? null : _showRejectDialog,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: SahayaColors.coral, width: 2),
-                  foregroundColor: SahayaColors.coral,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: _processing ? null : _showRejectDialog,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: SahayaColors.coral, width: 2),
+                    foregroundColor: SahayaColors.coral,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  label: T(
+                    'Reject Submission',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
-                child: const Icon(Icons.close_rounded, size: 28),
               ),
             ),
           ],
