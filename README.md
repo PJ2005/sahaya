@@ -188,8 +188,8 @@ stateDiagram-v2
     expired --> [*]
 ```
 
-## Judging Criteria Mapping
-### Technical Merit (40%)
+## Engineering Highlights
+### Technical Depth
 #### Technical Complexity
 - Multi-channel ingestion (text, media, Telegram, voice) and structured decomposition into problem cards and tasks.
 - End-to-end lifecycle pipeline: extraction, prioritization, matching, dispatch, chat coordination, proof verification, completion cascade.
@@ -217,7 +217,7 @@ stateDiagram-v2
 - Explicit offline sync conflict policy with audit logging (`server_wins` + conflict record).
 - Data minimization in extraction flow through anonymized descriptions.
 
-### User Experience (10%)
+### User Experience
 #### Design and Navigation
 - Role-specific app flavors prevent cross-role UI noise and reduce cognitive load.
 - High-frequency workflows are one-tap accessible: chat hub, unread indicators, review queue, AI assist actions.
@@ -231,7 +231,7 @@ stateDiagram-v2
 - Clear visual hierarchy, status badges, and explicit labels across critical operations.
 - Localization-ready text wrappers and consistent interaction patterns across both app flavors.
 
-### Alignment With Cause (25%)
+### Problem-Solution Fit
 #### Problem Definition
 - Directly targets real NGO bottlenecks: fragmented data, slow triage, delayed dispatch, and verification burden.
 
@@ -245,7 +245,7 @@ stateDiagram-v2
 #### Expected Impact
 - Expected improvements include reduced dispatch latency, faster issue closure, lower manual review load, and higher volunteer-task fit quality.
 
-### Innovation and Creativity (25%)
+### Innovation
 #### Originality
 - Combines civic operations tooling, AI extraction, explainable matching, and trust-based verification into a single operational loop.
 
@@ -257,7 +257,7 @@ stateDiagram-v2
 - Built with extensible taxonomies, explainability traces, and operational metrics to support city-level rollout and policy-grade reporting.
 
 ## Impact Measurement Framework
-Sahaya tracks measurable operational outcomes suitable for judging and real deployments:
+Sahaya tracks measurable operational outcomes for real-world deployments:
 1. Time-to-triage: report ingestion to approved problem card.
 2. Time-to-dispatch: approved task to volunteer acceptance.
 3. Match quality: acceptance rate and proof approval rate by match score band.
@@ -337,8 +337,8 @@ Recommendation: use an always-on paid plan for production reliability, stable co
 - Conflict logging for offline sync with explicit merge policy.
 - Verification anomaly tracking and quality event audit trails.
 
-## Evaluation Readiness
-Sahaya is prepared for challenge evaluation with explicit evidence across:
+## Deployment Confidence
+Sahaya is designed for practical deployment with clear strengths across:
 1. Technical depth and robust implementation.
 2. Responsible and necessary AI integration.
 3. Cause alignment with measurable social impact outcomes.
