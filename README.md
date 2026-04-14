@@ -104,6 +104,90 @@ flowchart LR
     H --> I[AI Rubric Verification + NGO Review]
 ```
 
+## Architecture References
+- Full technical deep dive: [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)
+- Presentation-ready slide pack: [SYSTEM_ARCHITECTURE_SLIDES.md](SYSTEM_ARCHITECTURE_SLIDES.md)
+
+## Additional Architecture Diagrams
+### Operational Loop (Detailed)
+```mermaid
+flowchart TD
+    A[Ingest reports/media] --> B[(raw_uploads)]
+    B --> C[Extraction + normalization]
+    C --> D[Gemini extraction]
+    D --> E[(problem_cards)]
+    E --> F[NGO review/approve]
+    F --> G[Task generation]
+    G --> H[(tasks)]
+    H --> I[Matching engine]
+    I --> J[(match_records)]
+    J --> K[Volunteer execution + proof]
+    K --> L[Auto/manual proof verification]
+    L --> M[Approve or reject]
+    M --> N[Completion cascade + impact]
+    M --> O[Rejection alert + resubmission loop]
+```
+
+### Core Components
+```mermaid
+flowchart LR
+    subgraph Flutter NGO
+      N1[ngo_dashboard]
+      N2[ngo_home]
+      N3[review/proof screens]
+      N4[chat + notifications]
+      N5[impact + heatmap]
+    end
+
+    subgraph Flutter Volunteer
+      V1[gateway/auth/onboarding]
+      V2[volunteer_home]
+      V3[active_task]
+      V4[task_chat + chat_hub]
+      V5[volunteer_notifications]
+    end
+
+    subgraph Shared
+      S1[models]
+      S2[services]
+      S3[components]
+      S4[theme + l10n]
+    end
+
+    subgraph Backend
+      B1[Webhook ingest]
+      B2[AI extract/edit]
+      B3[Task generation]
+      B4[Matching + redispatch]
+      B5[Proof verify]
+      B6[Offline sync resolver]
+      B7[Simulation + reminders]
+    end
+
+    N1 --> S1
+    N2 --> S2
+    N3 --> S3
+    V2 --> S1
+    V3 --> S2
+    V5 --> S3
+    S2 --> Backend
+```
+
+### Match Lifecycle State Machine
+```mermaid
+stateDiagram-v2
+    [*] --> open
+    open --> accepted: volunteer accepts
+    accepted --> proof_submitted: volunteer uploads proof
+    accepted --> expired: stale acceptance redispatch
+    proof_submitted --> proof_approved: auto/manual approve
+    proof_submitted --> proof_rejected: NGO rejects with note
+    proof_rejected --> proof_submitted: volunteer resubmits
+    proof_approved --> completed: completion cascade marker
+    completed --> [*]
+    expired --> [*]
+```
+
 ## Judging Criteria Mapping
 ### Technical Merit (40%)
 #### Technical Complexity
