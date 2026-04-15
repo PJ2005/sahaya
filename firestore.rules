@@ -31,6 +31,14 @@ service cloud.firestore {
         request.auth.uid in request.resource.data.assignedVolunteerIds;
     }
 
+    function isVolunteerProofSubmit() {
+      return isAuthenticated() &&
+        request.auth.uid in resource.data.assignedVolunteerIds &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['isProofSubmitted']) &&
+        resource.data.isProofSubmitted == false &&
+        request.resource.data.isProofSubmitted == true;
+    }
+
     function isNgoForMatch() {
       return isAuthenticated() && request.auth.uid == ngoIdByTask(resource.data.taskId);
     }
@@ -54,7 +62,7 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow read: if isAuthenticated();
       allow create: if isTaskNgoOwnerOnCreate();
-      allow update: if isTaskNgoOwner() || isVolunteerSelfClaim();
+      allow update: if isTaskNgoOwner() || isVolunteerSelfClaim() || isVolunteerProofSubmit();
       allow delete: if isTaskNgoOwner();
     }
     match /ngo_profiles/{profileId} {

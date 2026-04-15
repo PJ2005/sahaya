@@ -31,7 +31,7 @@ _TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => _TaskModel(
   isProofSubmitted: json['isProofSubmitted'] as bool? ?? false,
   locationWard: json['locationWard'] as String? ?? 'Unknown Ward',
   locationGeoPoint: const OptionalGeoPointConverter().fromJson(
-    json['locationGeoPoint'] as GeoPoint?,
+    json['locationGeoPoint'],
   ),
 );
 

@@ -53,6 +53,15 @@ class OptionalGeoPointConverter implements JsonConverter<GeoPoint?, GeoPoint?> {
   @override
   GeoPoint? fromJson(dynamic point) {
     if (point is GeoPoint) return point;
+    if (point is Map) {
+      final rawLat = point['latitude'] ?? point['lat'];
+      final rawLng = point['longitude'] ?? point['lng'] ?? point['lon'];
+      final lat = rawLat is num ? rawLat.toDouble() : double.tryParse('$rawLat');
+      final lng = rawLng is num ? rawLng.toDouble() : double.tryParse('$rawLng');
+      if (lat != null && lng != null) {
+        return GeoPoint(lat, lng);
+      }
+    }
     return null;
   }
 

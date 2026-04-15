@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -584,69 +585,94 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Attach at least 1 photo.'), backgroundColor: SahayaColors.coral));
       return;
     }
+
+    final localImagePaths = _images.map((f) => f.path).toList(growable: false);
+    final note = _noteCtrl.text.trim();
     setState(() => _submitting = true);
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
       bool isOffline = connectivityResult.contains(ConnectivityResult.none);
 
       if (isOffline) {
-        // Queue the proof offline
-        List<String> paths = _images.map((f) => f.path).toList();
-        await OfflineProofSyncService.queueOfflineProof(
+        unawaited(OfflineProofSyncService.queueOfflineProof(
           matchRecordId: widget.matchRecordId,
-          localImagePaths: paths,
-          note: _noteCtrl.text.trim(),
-        );
+          localImagePaths: localImagePaths,
+          note: note,
+        ));
 
-        await OfflineProofSyncService.queueTaskUpdate(
+        unawaited(OfflineProofSyncService.queueTaskUpdate(
           matchRecordId: widget.matchRecordId,
           taskId: widget.task.id,
           volunteerId: '',
           updates: {
             'matchStatus': 'proof_submitted',
             'taskStatus': widget.task.status.name,
-            'offlineNote': _noteCtrl.text.trim(),
+            'offlineNote': note,
           },
-          localMergeNote: _noteCtrl.text.trim(),
-        );
+          localMergeNote: note,
+        ));
 
         if (mounted) {
           SuccessOverlay.show(
             context,
-            'Offline Mode:\nProof saved securely.\nIt will sync automatically when online.',
+            'Proof submitted!\nIt will sync automatically when online.',
             onComplete: () => Navigator.of(context).pop(true),
           );
         }
         return;
       }
 
+      unawaited(_submitProofInBackground(localImagePaths, note));
+
+      if (mounted) {
+        SuccessOverlay.show(
+          context,
+          'Proof submitted!\nSyncing in background.',
+          onComplete: () => Navigator.of(context).pop(true),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Upload failed: $e'), backgroundColor: SahayaColors.coral));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _submitProofInBackground(List<String> localImagePaths, String note) async {
+    try {
       final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
       final preset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
       final cloudinary = CloudinaryPublic(cloudName, preset, cache: false);
 
-      // Check if already submitted by team just before uploading
       final preCheck = await FirebaseFirestore.instance.collection('tasks').doc(widget.task.id).get();
       if (preCheck.exists && (preCheck.data()?['isProofSubmitted'] ?? false)) {
-        throw Exception('A team member already submitted proof just now.');
+        return;
       }
 
-      List<String> urls = [];
-      for (var img in _images) {
-        final resp = await cloudinary.uploadFile(CloudinaryFile.fromFile(img.path, resourceType: CloudinaryResourceType.Image));
+      final urls = <String>[];
+      for (final path in localImagePaths) {
+        final resp = await cloudinary.uploadFile(
+          CloudinaryFile.fromFile(path, resourceType: CloudinaryResourceType.Image),
+        );
         urls.add(resp.secureUrl);
       }
 
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final taskRef = FirebaseFirestore.instance.collection('tasks').doc(widget.task.id);
         final matchRef = FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId);
-        
+
         final taskSnap = await transaction.get(taskRef);
         if (taskSnap.exists && (taskSnap.data()?['isProofSubmitted'] ?? false)) {
-          throw Exception('A team member already submitted proof while you were uploading.');
+          return;
         }
 
         transaction.update(matchRef, {
-          'proof': {'photoUrls': urls, 'secureUrls': urls, 'note': _noteCtrl.text.trim(), 'submittedAt': FieldValue.serverTimestamp()},
+          'proof': {
+            'photoUrls': urls,
+            'secureUrls': urls,
+            'note': note,
+            'submittedAt': FieldValue.serverTimestamp(),
+          },
           'status': 'proof_submitted',
           'aiVerificationLabel': FieldValue.delete(),
           'aiVerificationReason': FieldValue.delete(),
@@ -661,19 +687,15 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
       final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://10.0.2.2:5000';
       try {
         await http.post(
-          Uri.parse('$backendUrl/notify-proof-submitted'), 
-          headers: {'Content-Type': 'application/json'}, 
-          body: jsonEncode({'matchRecordId': widget.matchRecordId})
+          Uri.parse('$backendUrl/notify-proof-submitted'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'matchRecordId': widget.matchRecordId}),
         ).timeout(const Duration(seconds: 15));
       } catch (e) {
         debugPrint('Backend relay failed: $e');
       }
-
-      if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Upload failed: $e'), backgroundColor: SahayaColors.coral));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+      debugPrint('Background proof submission failed: $e');
     }
   }
 

@@ -30,6 +30,13 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
   final Map<String, DateTime?> _uploadedAtCache = <String, DateTime?>{};
   List<QueryDocumentSnapshot> _lastCards = <QueryDocumentSnapshot>[];
   List<QueryDocumentSnapshot> _lastMatches = <QueryDocumentSnapshot>[];
+  Future<List<Map<String, dynamic>>>? _incidentQueueFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _incidentQueueFuture = _loadIncidentQueue();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -168,8 +175,37 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     final t = AppText.of(context);
     final cs = Theme.of(context).colorScheme;
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _loadIncidentQueue(),
+      future: _incidentQueueFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+              boxShadow: [sahayaCardShadow(context)],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: SahayaColors.coral),
+                    const SizedBox(width: 8),
+                    T(t.incidentQueue, style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                T(
+                  'Incident queue is unavailable right now.',
+                  style: GoogleFonts.inter(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          );
+        }
+
         if (!snapshot.hasData) {
           return Container(
             padding: const EdgeInsets.all(20),
@@ -618,36 +654,43 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
     final now = DateTime.now();
     final incidents = <Map<String, dynamic>>[];
 
-    for (final doc in acceptedSnapshot.docs) {
-      final data = doc.data();
-      final createdAt = _asDate(data['createdAt']);
-      if (createdAt == null) continue;
-      final hours = now.difference(createdAt).inHours;
-      if (hours < 8) continue;
+    final incidentRows = await Future.wait(
+      acceptedSnapshot.docs.map((doc) async {
+        final data = doc.data();
+        final createdAt = _asDate(data['createdAt']);
+        if (createdAt == null) return null;
 
-      final taskId = data['taskId'] as String? ?? '';
-      if (taskId.isEmpty) continue;
+        final hours = now.difference(createdAt).inHours;
+        if (hours < 8) return null;
 
-      final taskDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
-      if (!taskDoc.exists) continue;
-      final taskData = taskDoc.data() as Map<String, dynamic>;
-      final cardId = taskData['problemCardId'] as String? ?? '';
-      if (cardId.isEmpty) continue;
+        final taskId = data['taskId'] as String? ?? '';
+        if (taskId.isEmpty) return null;
 
-      final cardDoc = await FirebaseFirestore.instance.collection('problem_cards').doc(cardId).get();
-      if (!cardDoc.exists) continue;
-      final cardData = cardDoc.data() as Map<String, dynamic>;
-      if ((cardData['ngoId'] as String?) != widget.ngoId) continue;
+        final taskDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+        if (!taskDoc.exists) return null;
 
-      final issue = (cardData['issueType'] as String?) ?? 'other';
-      incidents.add({
-        'matchId': doc.id,
-        'taskId': taskId,
-        'taskDescription': (taskData['description'] as String?) ?? 'Task',
-        'hoursStale': hours,
-        'sdgTag': _sdgTagForIssue(issue),
-      });
-    }
+        final taskData = taskDoc.data() as Map<String, dynamic>;
+        final cardId = taskData['problemCardId'] as String? ?? '';
+        if (cardId.isEmpty) return null;
+
+        final cardDoc = await FirebaseFirestore.instance.collection('problem_cards').doc(cardId).get();
+        if (!cardDoc.exists) return null;
+
+        final cardData = cardDoc.data() as Map<String, dynamic>;
+        if ((cardData['ngoId'] as String?) != widget.ngoId) return null;
+
+        final issue = (cardData['issueType'] as String?) ?? 'other';
+        return {
+          'matchId': doc.id,
+          'taskId': taskId,
+          'taskDescription': (taskData['description'] as String?) ?? 'Task',
+          'hoursStale': hours,
+          'sdgTag': _sdgTagForIssue(issue),
+        };
+      }),
+    );
+
+    incidents.addAll(incidentRows.whereType<Map<String, dynamic>>());
 
     incidents.sort((a, b) => (b['hoursStale'] as int).compareTo(a['hoursStale'] as int));
     return incidents;
@@ -666,7 +709,9 @@ class _NgoImpactDashboardScreenState extends State<NgoImpactDashboardScreen> {
       if (!mounted) return;
       if (response.statusCode >= 200 && response.statusCode < 300) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: T('Redispatch triggered.'), backgroundColor: SahayaColors.emerald));
-        setState(() {});
+        setState(() {
+          _incidentQueueFuture = _loadIncidentQueue();
+        });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: T('Redispatch failed: ${response.statusCode}'), backgroundColor: SahayaColors.coral));
       }

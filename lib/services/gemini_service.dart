@@ -19,6 +19,38 @@ class GeminiService {
     return dotenv.env['BACKEND_URL'] ?? 'https://sahaya-faas-puz67as73a-uc.a.run.app';
   }
 
+  static dynamic _jsonSafeValue(dynamic value) {
+    if (value == null || value is String || value is num || value is bool) {
+      return value;
+    }
+    if (value is DateTime) {
+      return value.toIso8601String();
+    }
+    if (value is Timestamp) {
+      return value.toDate().toIso8601String();
+    }
+    if (value is GeoPoint) {
+      return {
+        'latitude': value.latitude,
+        'longitude': value.longitude,
+      };
+    }
+    if (value is DocumentReference) {
+      return value.path;
+    }
+    if (value is Map) {
+      return value.map((key, entryValue) => MapEntry('$key', _jsonSafeValue(entryValue)));
+    }
+    if (value is Iterable) {
+      return value.map(_jsonSafeValue).toList();
+    }
+    return value.toString();
+  }
+
+  static Map<String, dynamic> _jsonSafeMap(Map<String, dynamic> value) {
+    return Map<String, dynamic>.from(_jsonSafeValue(value) as Map);
+  }
+
   static Future<List<ProblemCard>> structureProblemCard(RawUpload upload) async {
     String textPayload = '';
     bool isTextPayload = upload.fileType == 'csv' || upload.fileType == 'text' || upload.fileType == 'document' || upload.cloudinaryUrl.toLowerCase().contains('.pdf') || upload.cloudinaryUrl.toLowerCase().contains('.csv');
@@ -84,11 +116,12 @@ class GeminiService {
     required String instruction,
     required String contextDescription,
   }) async {
+    final safeCurrentData = _jsonSafeMap(currentData);
     final response = await http.post(
       Uri.parse('$_backendUrl/api/gemini/ai-edit'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'currentData': currentData,
+        'currentData': safeCurrentData,
         'instruction': instruction,
         'contextDescription': contextDescription,
       }),
@@ -105,11 +138,12 @@ class GeminiService {
     required String instruction,
     required String contextDescription,
   }) async {
+    final safeCurrentItems = currentItems.map(_jsonSafeMap).toList();
     final response = await http.post(
       Uri.parse('$_backendUrl/api/gemini/ai-edit-list'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'currentItems': currentItems,
+        'currentItems': safeCurrentItems,
         'instruction': instruction,
         'contextDescription': contextDescription,
       }),
