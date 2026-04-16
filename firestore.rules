@@ -8,11 +8,15 @@ service cloud.firestore {
     }
 
     function ngoIdByCard(cardId) {
-      return get(/databases/$(database)/documents/problem_cards/$(cardId)).data.ngoId;
+      return exists(/databases/$(database)/documents/problem_cards/$(cardId))
+        ? get(/databases/$(database)/documents/problem_cards/$(cardId)).data.ngoId
+        : null;
     }
 
     function ngoIdByTask(taskId) {
-      return ngoIdByCard(get(/databases/$(database)/documents/tasks/$(taskId)).data.problemCardId);
+      return exists(/databases/$(database)/documents/tasks/$(taskId))
+        ? ngoIdByCard(get(/databases/$(database)/documents/tasks/$(taskId)).data.problemCardId)
+        : null;
     }
 
     function isTaskNgoOwner() {
@@ -47,6 +51,14 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == resource.data.volunteerId;
     }
 
+    function canReadTaskChat(taskId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/tasks/$(taskId)) && (
+          request.auth.uid in get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVolunteerIds ||
+          request.auth.uid == ngoIdByTask(taskId)
+        );
+    }
+
     match /users/{userId} {
       // Basic rule for the user schema we created earlier
       allow read: if isAuthenticated();
@@ -76,7 +88,8 @@ service cloud.firestore {
     }
 
     match /match_records/{matchId} {
-      allow read: if isVolunteerForMatch() || isNgoForMatch();
+      // Query-safe read needed for admin streams filtered by status.
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.volunteerId;
       allow update: if isVolunteerForMatch() || isNgoForMatch();
       allow delete: if isNgoForMatch();
@@ -99,10 +112,7 @@ service cloud.firestore {
 
     match /task_chats/{taskId} {
       match /messages/{messageId} {
-        allow read, create: if isAuthenticated() && (
-          request.auth.uid in get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVolunteerIds ||
-          request.auth.uid == ngoIdByTask(taskId)
-        );
+        allow read, create: if canReadTaskChat(taskId);
       }
     }
   }

@@ -12,6 +12,73 @@ class ProofReviewScreen extends StatelessWidget {
   final String ngoId;
   const ProofReviewScreen({super.key, required this.ngoId});
 
+  Future<List<_ProofReviewItem>> _loadPendingForNgo() async {
+    final pendingSnap = await FirebaseFirestore.instance
+        .collection('match_records')
+        .where('status', isEqualTo: 'proof_submitted')
+        .get();
+
+    if (pendingSnap.docs.isEmpty) {
+      return <_ProofReviewItem>[];
+    }
+
+    final taskCache = <String, Map<String, dynamic>?>{};
+    final cardCache = <String, String?>{};
+    final items = <_ProofReviewItem>[];
+
+    for (final doc in pendingSnap.docs) {
+      final data = doc.data();
+      final taskId = (data['taskId'] as String?) ?? '';
+      if (taskId.isEmpty) {
+        continue;
+      }
+
+      Map<String, dynamic>? taskData = taskCache[taskId];
+      if (!taskCache.containsKey(taskId)) {
+        final taskDoc = await FirebaseFirestore.instance
+            .collection('tasks')
+            .doc(taskId)
+            .get();
+        taskData = taskDoc.data();
+        taskCache[taskId] = taskData;
+      }
+      if (taskData == null) {
+        continue;
+      }
+
+      final cardId = (taskData['problemCardId'] as String?) ?? '';
+      if (cardId.isEmpty) {
+        continue;
+      }
+
+      String? ownerNgoId = cardCache[cardId];
+      if (!cardCache.containsKey(cardId)) {
+        final cardDoc = await FirebaseFirestore.instance
+            .collection('problem_cards')
+            .doc(cardId)
+            .get();
+        ownerNgoId = cardDoc.data()?['ngoId'] as String?;
+        cardCache[cardId] = ownerNgoId;
+      }
+
+      if (ownerNgoId == ngoId) {
+        items.add(_ProofReviewItem(matchRecordId: doc.id, matchData: data));
+      }
+    }
+
+    items.sort((a, b) {
+      final aProof = a.matchData['proof'] as Map<String, dynamic>?;
+      final bProof = b.matchData['proof'] as Map<String, dynamic>?;
+      final aTs = aProof?['submittedAt'];
+      final bTs = bProof?['submittedAt'];
+      final aMillis = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+      final bMillis = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+      return bMillis.compareTo(aMillis);
+    });
+
+    return items;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,79 +94,41 @@ class ProofReviewScreen extends StatelessWidget {
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('problem_cards')
-            .where('ngoId', isEqualTo: ngoId)
+            .collection('match_records')
+            .where('status', isEqualTo: 'proof_submitted')
             .snapshots(),
-        builder: (context, cardsSnapshot) {
-          if (cardsSnapshot.hasError) {
+        builder: (context, matchSnapshot) {
+          if (matchSnapshot.hasError) {
             return _emptyState(context);
           }
-          if (cardsSnapshot.connectionState == ConnectionState.waiting &&
-              !cardsSnapshot.hasData) {
+          if (matchSnapshot.connectionState == ConnectionState.waiting &&
+              !matchSnapshot.hasData) {
             return const ListShimmer(itemCount: 6);
           }
 
-          final cardIds =
-              cardsSnapshot.data?.docs.map((doc) => doc.id).toList() ??
-              <String>[];
-          if (cardIds.isEmpty) {
-            return _emptyState(context);
-          }
-
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('tasks')
-                .where('problemCardId', whereIn: cardIds.take(30).toList())
-                .snapshots(),
-            builder: (context, tasksSnapshot) {
-              if (tasksSnapshot.hasError) {
-                return _emptyState(context);
-              }
-              if (!tasksSnapshot.hasData) {
+          return FutureBuilder<List<_ProofReviewItem>>(
+            future: _loadPendingForNgo(),
+            builder: (context, filteredSnapshot) {
+              if (filteredSnapshot.connectionState == ConnectionState.waiting) {
                 return const ListShimmer(itemCount: 6);
               }
 
-              final taskIds = tasksSnapshot.data!.docs
-                  .map((doc) => doc.id)
-                  .toList();
-              if (taskIds.isEmpty) {
+              final pending = filteredSnapshot.data ?? const <_ProofReviewItem>[];
+              if (pending.isEmpty) {
                 return _emptyState(context);
               }
 
-              return StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('match_records')
-                    .where('taskId', whereIn: taskIds.take(30).toList())
-                    .snapshots(),
-                builder: (context, matchSnapshot) {
-                  if (matchSnapshot.hasError) {
-                    return _emptyState(context);
-                  }
-                  if (!matchSnapshot.hasData) {
-                    return const ListShimmer(itemCount: 6);
-                  }
-
-                  final pendingDocs = matchSnapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return data['status'] == 'proof_submitted';
-                  }).toList();
-                  if (pendingDocs.isEmpty) {
-                    return _emptyState(context);
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    itemCount: pendingDocs.length,
-                    itemBuilder: (context, index) {
-                      final doc = pendingDocs[index];
-                      return _ProofBlock(
-                        matchRecordId: doc.id,
-                        matchData: doc.data() as Map<String, dynamic>,
-                      );
-                    },
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                itemCount: pending.length,
+                itemBuilder: (context, index) {
+                  final item = pending[index];
+                  return _ProofBlock(
+                    matchRecordId: item.matchRecordId,
+                    matchData: item.matchData,
                   );
                 },
               );
@@ -136,6 +165,16 @@ class ProofReviewScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProofReviewItem {
+  final String matchRecordId;
+  final Map<String, dynamic> matchData;
+
+  const _ProofReviewItem({
+    required this.matchRecordId,
+    required this.matchData,
+  });
 }
 
 class _ProofBlock extends StatefulWidget {

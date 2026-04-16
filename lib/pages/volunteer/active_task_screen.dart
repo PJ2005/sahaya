@@ -54,6 +54,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   static const String _coordinatorDummyPhone = '+919123456789';
 
   late Future<Map<String, String>> _ngoInfoFuture;
+  String? _ngoId;
 
   String _cleanPhone(String? raw) {
     return (raw ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
@@ -76,14 +77,11 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
   }
 
   Future<Map<String, String>> _fetchNgoInfo() async {
-    // If all info is provided, return immediately
-    if (widget.ngoName != null && widget.ngoPhone != null && widget.ngoEmail != null) {
-      return {
-        'name': widget.ngoName!,
-        'phone': widget.ngoPhone!,
-        'email': widget.ngoEmail!,
-      };
-    }
+    final fallback = {
+      'name': widget.ngoName ?? 'Coordinator',
+      'phone': widget.ngoPhone ?? '',
+      'email': widget.ngoEmail ?? '',
+    };
 
     try {
       final problemDoc = await FirebaseFirestore.instance.collection('problem_cards').doc(widget.task.problemCardId).get();
@@ -91,6 +89,12 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
       
       final ngoId = problemDoc.data()?['ngoId'];
       if (ngoId == null) throw 'NGO ID missing';
+      _ngoId = ngoId;
+
+      // If contact metadata was already provided, keep it and only use Firestore for ngoId resolution.
+      if (widget.ngoName != null && widget.ngoPhone != null && widget.ngoEmail != null) {
+        return fallback;
+      }
 
       final ngoDoc = await FirebaseFirestore.instance.collection('ngo_profiles').doc(ngoId).get();
       if (ngoDoc.exists) {
@@ -110,11 +114,7 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
         'email': legacyDoc['email'] ?? '',
       };
     } catch (e) {
-      return {
-        'name': widget.ngoName ?? 'Coordinator',
-        'phone': widget.ngoPhone ?? '',
-        'email': widget.ngoEmail ?? '',
-      };
+      return fallback;
     }
   }
 
@@ -153,7 +153,11 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => ProofSubmissionSheet(matchRecordId: widget.matchRecordId, task: widget.task),
+      builder: (_) => ProofSubmissionSheet(
+        matchRecordId: widget.matchRecordId, 
+        task: widget.task,
+        ngoId: _ngoId,
+      ),
     ).then((submitted) {
       if (submitted == true && mounted) {
         SuccessOverlay.show(
@@ -505,7 +509,8 @@ class _ActiveTaskScreenState extends State<ActiveTaskScreen> {
 class ProofSubmissionSheet extends StatefulWidget {
   final String matchRecordId;
   final TaskModel task;
-  const ProofSubmissionSheet({super.key, required this.matchRecordId, required this.task});
+  final String? ngoId;
+  const ProofSubmissionSheet({super.key, required this.matchRecordId, required this.task, this.ngoId});
 
   @override
   State<ProofSubmissionSheet> createState() => _ProofSubmissionSheetState();
@@ -516,6 +521,41 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
   List<XFile> _images = [];
   final TextEditingController _noteCtrl = TextEditingController();
   bool _submitting = false;
+
+  Uri _proofNotifyUri(String baseUrl) {
+    final trimmed = baseUrl.trim();
+    if (trimmed.endsWith('/notify-proof-submitted')) {
+      return Uri.parse(trimmed);
+    }
+    return Uri.parse('$trimmed/notify-proof-submitted');
+  }
+
+  Future<bool> _relayProofSubmitted(String matchRecordId) async {
+    final configured = (dotenv.env['BACKEND_URL'] ?? '').trim();
+    const fallback = 'https://sahaya-faas-puz67as73a-uc.a.run.app';
+    final candidates = <String>[
+      if (configured.isNotEmpty) configured,
+      fallback,
+    ];
+
+    for (final candidate in candidates.toSet()) {
+      try {
+        final resp = await http
+            .post(
+              _proofNotifyUri(candidate),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'matchRecordId': matchRecordId}),
+            )
+            .timeout(const Duration(seconds: 10));
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          return true;
+        }
+      } catch (e) {
+        debugPrint('Backend relay failed ($candidate): $e');
+      }
+    }
+    return false;
+  }
   
   late stt.SpeechToText _speech;
   bool _isListening = false;
@@ -622,12 +662,29 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
         return;
       }
 
-      unawaited(_submitProofInBackground(localImagePaths, note));
+      // Optimistic Update: Set status to submitted immediately so both sides see it while images upload
+      final mId = widget.matchRecordId;
+      final tId = widget.task.id;
+      final nId = widget.ngoId;
+
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Only update the task metadata and note optimistically. 
+        // We leave the status as-is until photos are ready so admin doesn't see a blank record.
+        transaction.update(FirebaseFirestore.instance.collection('match_records').doc(mId), {
+          'proof.submittedAt': FieldValue.serverTimestamp(),
+          'proof.note': note,
+        });
+        transaction.update(FirebaseFirestore.instance.collection('tasks').doc(tId), {
+          'isProofSubmitted': true,
+        });
+      });
+
+      unawaited(_submitProofInBackground(localImagePaths, note, mId, tId, nId));
 
       if (mounted) {
         SuccessOverlay.show(
           context,
-          'Proof submitted!\nSyncing in background.',
+          'Proof submitted!\nUploading in background.',
           onComplete: () => Navigator.of(context).pop(true),
         );
       }
@@ -638,61 +695,58 @@ class _ProofSubmissionSheetState extends State<ProofSubmissionSheet> {
     }
   }
 
-  Future<void> _submitProofInBackground(List<String> localImagePaths, String note) async {
+  Future<void> _submitProofInBackground(
+    List<String> localImagePaths, 
+    String note, 
+    String matchRecordId, 
+    String taskId,
+    String? ngoId,
+  ) async {
     try {
       final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
       final preset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
       final cloudinary = CloudinaryPublic(cloudName, preset, cache: false);
 
-      final preCheck = await FirebaseFirestore.instance.collection('tasks').doc(widget.task.id).get();
-      if (preCheck.exists && (preCheck.data()?['isProofSubmitted'] ?? false)) {
-        return;
-      }
-
       final urls = <String>[];
       for (final path in localImagePaths) {
-        final resp = await cloudinary.uploadFile(
-          CloudinaryFile.fromFile(path, resourceType: CloudinaryResourceType.Image),
-        );
-        urls.add(resp.secureUrl);
+        try {
+          final resp = await cloudinary.uploadFile(
+            CloudinaryFile.fromFile(path, resourceType: CloudinaryResourceType.Image),
+          );
+          urls.add(resp.secureUrl);
+        } catch (e) {
+          debugPrint('Single image upload failed: $e');
+        }
       }
 
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final taskRef = FirebaseFirestore.instance.collection('tasks').doc(widget.task.id);
-        final matchRef = FirebaseFirestore.instance.collection('match_records').doc(widget.matchRecordId);
+      if (urls.isEmpty) return; // All uploads failed
 
-        final taskSnap = await transaction.get(taskRef);
-        if (taskSnap.exists && (taskSnap.data()?['isProofSubmitted'] ?? false)) {
-          return;
-        }
-
-        transaction.update(matchRef, {
-          'proof': {
-            'photoUrls': urls,
-            'secureUrls': urls,
-            'note': note,
-            'submittedAt': FieldValue.serverTimestamp(),
-          },
-          'status': 'proof_submitted',
-          'aiVerificationLabel': FieldValue.delete(),
-          'aiVerificationReason': FieldValue.delete(),
-          'aiVerifiedAt': FieldValue.delete(),
-        });
-
-        transaction.update(taskRef, {
-          'isProofSubmitted': true,
-        });
+      await FirebaseFirestore.instance.collection('match_records').doc(matchRecordId).update({
+        'proof.photoUrls': urls,
+        'proof.secureUrls': urls,
+        'status': 'proof_submitted', // Update status ONLY after photos are uploaded
+        'proof.updatedAt': FieldValue.serverTimestamp(),
       });
 
-      final backendUrl = dotenv.env['BACKEND_URL'] ?? 'http://10.0.2.2:5000';
-      try {
-        await http.post(
-          Uri.parse('$backendUrl/notify-proof-submitted'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'matchRecordId': widget.matchRecordId}),
-        ).timeout(const Duration(seconds: 15));
-      } catch (e) {
-        debugPrint('Backend relay failed: $e');
+      // Notifications: Backend first, fallback to direct Firestore
+      final backendNotified = await _relayProofSubmitted(matchRecordId);
+
+      // If backend failed or we have the ngoId, ensure a notification exists
+      if (!backendNotified && ngoId != null) {
+        try {
+          await FirebaseFirestore.instance.collection('ngo_notifications').add({
+            'ngoId': ngoId,
+            'matchRecordId': matchRecordId,
+            'taskId': taskId,
+            'type': 'proof_submitted',
+            'title': 'New Proof Submission',
+            'message': 'A volunteer has submitted proof for a task.',
+            'createdAt': FieldValue.serverTimestamp(),
+            'read': false,
+          });
+        } catch (e) {
+          debugPrint('Direct notification creation failed: $e');
+        }
       }
     } catch (e) {
       debugPrint('Background proof submission failed: $e');

@@ -86,6 +86,38 @@ class OfflineProofSyncService {
     await prefs.setStringList(_deadKey, dead);
   }
 
+  static Uri _proofNotifyUri(String baseUrl) {
+    final trimmed = baseUrl.trim();
+    if (trimmed.endsWith('/notify-proof-submitted')) {
+      return Uri.parse(trimmed);
+    }
+    return Uri.parse('$trimmed/notify-proof-submitted');
+  }
+
+  static Future<bool> _relayProofSubmitted(String matchRecordId, String backendUrl) async {
+    const fallback = 'https://sahaya-faas-puz67as73a-uc.a.run.app';
+    final candidates = <String>[
+      if (backendUrl.trim().isNotEmpty) backendUrl.trim(),
+      fallback,
+    ];
+
+    for (final candidate in candidates.toSet()) {
+      try {
+        final resp = await http
+            .post(
+              _proofNotifyUri(candidate),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'matchRecordId': matchRecordId}),
+            )
+            .timeout(const Duration(seconds: 15));
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
   static Future<bool> _syncProofAction(
     Map<String, dynamic> payload,
     CloudinaryPublic cloudinary,
@@ -117,13 +149,10 @@ class OfflineProofSyncService {
       'aiVerifiedAt': FieldValue.delete(),
     });
 
-    await http
-        .post(
-          Uri.parse('$backendUrl/notify-proof-submitted'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'matchRecordId': matchRecordId}),
-        )
-        .timeout(const Duration(seconds: 15));
+    final relayed = await _relayProofSubmitted(matchRecordId, backendUrl);
+    if (!relayed) {
+      throw Exception('proof relay unavailable');
+    }
 
     return true;
   }

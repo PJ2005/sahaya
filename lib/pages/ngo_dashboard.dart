@@ -29,6 +29,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
   int _currentIndex = 0;
   late final List<Widget> _children;
   StreamSubscription<QuerySnapshot>? _proofNotificationSubscription;
+  Timer? _proofBannerTimer;
   final Set<String> _shownNotificationIds = <String>{};
   int _lastPendingProofCount = 0;
 
@@ -57,6 +58,7 @@ class _NgoDashboardState extends State<NgoDashboard> {
   @override
   void dispose() {
     _proofNotificationSubscription?.cancel();
+    _proofBannerTimer?.cancel();
     super.dispose();
   }
 
@@ -100,9 +102,10 @@ class _NgoDashboardState extends State<NgoDashboard> {
     if (!mounted) return;
     
     final messenger = ScaffoldMessenger.of(context);
+    _proofBannerTimer?.cancel();
     messenger.clearSnackBars(); // remove any existing
     
-    messenger.showSnackBar(
+    final controller = messenger.showSnackBar(
       SnackBar(
         content: T(
           count == 1
@@ -127,6 +130,13 @@ class _NgoDashboardState extends State<NgoDashboard> {
         ),
       ),
     );
+
+    // Force close in case platform accessibility settings keep action snackbars open.
+    _proofBannerTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        controller.close();
+      }
+    });
   }
 
   Future<void> _handleLogout() async {

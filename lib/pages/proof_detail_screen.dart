@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../theme/sahaya_theme.dart';
 import '../models/problem_card.dart';
+import '../services/gemini_service.dart';
 import 'ngo_task_detail_screen.dart';
 import '../utils/translator.dart';
 
@@ -254,44 +255,127 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
 
   void _showRejectDialog() {
     final ctrl = TextEditingController();
+    bool startedDraft = false;
+    bool isDraftLoading = true;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const T('Reject Proof'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const T('Why are you rejecting this submission?'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              maxLength: 100,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Photo quality is too low',
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          if (!startedDraft) {
+            startedDraft = true;
+            unawaited(() async {
+              final draft = await _generateRejectDraft();
+              if (!ctx.mounted) return;
+              setDialogState(() {
+                ctrl.text = draft;
+                isDraftLoading = false;
+              });
+            }());
+          }
+
+          return AlertDialog(
+            title: const T('Reject Proof'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const T('AI drafted reason below. Edit before sending.'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  maxLength: 120,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Reason for rejection',
+                    suffixIcon: isDraftLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const T('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: SahayaColors.coral,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          final reason = ctrl.text.trim();
+                          if (reason.isEmpty) return;
+                          Navigator.pop(ctx);
+                          _reject(reason);
+                        },
+                        child: const T('Reject'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const T('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: SahayaColors.coral,
-            ),
-            onPressed: () {
-              if (ctrl.text.trim().isEmpty) return;
-              Navigator.pop(ctx);
-              _reject(ctrl.text.trim());
-            },
-            child: const T('Reject Submission'),
-          ),
-        ],
+          );
+        },
       ),
     );
+  }
+
+  Future<String> _generateRejectDraft() async {
+    final taskDesc = (_taskData?['description'] as String?) ?? '';
+    final aiHint = _aiVerificationReason ?? '';
+    final proofNote = _note;
+
+    try {
+      final result = await GeminiService.aiEdit(
+        currentData: {
+          'reason': '',
+          'taskDescription': taskDesc,
+          'proofNote': proofNote,
+          'aiInsight': aiHint,
+        },
+        instruction:
+            'Draft a concise and polite proof rejection reason for a volunteer. '
+            'Tone: respectful, actionable. Mention what to improve and ask for resubmission. '
+            'Maximum 120 characters. Return JSON with key "reason" only.',
+        contextDescription: 'NGO proof rejection message draft',
+      );
+
+      final candidate = (result['reason'] as String?)?.trim() ?? '';
+      if (candidate.isNotEmpty) {
+        return candidate.length > 120
+            ? '${candidate.substring(0, 117)}...'
+            : candidate;
+      }
+    } catch (_) {}
+
+    final fallback = aiHint.isNotEmpty
+        ? 'Please re-upload clearer proof. Note: $aiHint'
+        : 'Proof is unclear. Please upload clearer photos showing completed work.';
+    return fallback.length > 120 ? '${fallback.substring(0, 117)}...' : fallback;
   }
 
   Future<void> _reject(String reason) async {
@@ -566,6 +650,7 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: SahayaColors.emerald,
                     foregroundColor: Colors.white,
+                    alignment: Alignment.center,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -581,7 +666,8 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
                           ),
                         )
                       : T(
-                          'Approve Submission',
+                          'Approve',
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
@@ -594,21 +680,22 @@ class _ProofDetailScreenState extends State<ProofDetailScreen> {
             Expanded(
               child: SizedBox(
                 height: 56,
-                child: OutlinedButton.icon(
+                child: OutlinedButton(
                   onPressed: _processing ? null : _showRejectDialog,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: SahayaColors.coral, width: 2),
                     foregroundColor: SahayaColors.coral,
+                    alignment: Alignment.center,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  label: T(
-                    'Reject Submission',
+                  child: T(
+                    'Reject',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
                     ),
                   ),
                 ),
